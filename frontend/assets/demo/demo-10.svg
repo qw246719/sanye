@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 1400" width="1050" height="1400" role="img" aria-label="暖礁">
+  <title>暖礁</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2=".9" y2="1">
+      <stop offset="0" stop-color="#F6E4D8"/>
+      <stop offset="1" stop-color="#C08A72"/>
+    </linearGradient>
+    <radialGradient id="hi" cx=".3" cy=".22" r=".68">
+      <stop offset="0" stop-color="#FFF6F0" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#FFF6F0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vi" cx=".5" cy=".52" r=".78">
+      <stop offset=".45" stop-color="#6E3A28" stop-opacity="0"/>
+      <stop offset="1" stop-color="#6E3A28" stop-opacity=".30"/>
+    </radialGradient>
+  </defs>
+  <rect width="1050" height="1400" fill="url(#bg)"/>
+  <rect width="1050" height="1400" fill="url(#hi)"/>
+  <rect width="1050" height="1400" fill="url(#vi)"/>
+</svg>

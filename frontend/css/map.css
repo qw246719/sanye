@@ -1,0 +1,499 @@
+/* ============================================================
+   作品地图页
+
+   这份 CSS 只写地图页自己的东西。配色/字体/缓动一律走 gallery.css
+   里已有的变量（map.html 引了那份），不在这儿重定义 token ——
+   页面上没有 style.css，所以那边独有的 --radius / --surface 之类
+   在这儿是不存在的，用到圆角就写死数值，别写 var(--radius-sm)，
+   那种变量找不到值会让整条 border-radius 声明作废、圆角悄没声变成 0。
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   对 gallery.css 的三处必要覆盖。都是实测会咬人的，不是洁癖
+   ------------------------------------------------------------ */
+
+/* 1. 首页那个 .lb 是 z-index: 60，因为它只跟首屏(0)和 .flow(10)比。
+      地图页的详情层是 160、顶栏 100 —— 不改的话从详情里点开灯箱，
+      图会被详情盖在下面，看着像没反应 */
+.lb {
+    z-index: 200;
+}
+
+/* 关灯箱那两百多毫秒里 .lb 还挂在屏幕上（等淡出跑完才 hidden），
+   不收掉点击会挡住地图 */
+.lb:not(.is-open) {
+    pointer-events: none;
+}
+
+/* 首页那张大图是靠 FLIP 飞过去的，本来就有动画；地图页只淡入，
+   而 gallery.css 里 .lb__img 没有任何透明度过渡，不补这条它就一直
+   是「啪」地出现，只有背景和字幕在淡 */
+.lb__img {
+    opacity: 0;
+    transition: opacity .3s var(--ease);
+}
+
+.lb.is-open .lb__img {
+    opacity: 1;
+}
+
+/* 2. gallery.css 给 html 挂了 scrollbar-gutter: stable，那是首页灯箱
+      锁滚动时防横向抖用的。地图页整页不滚（详情层自己内部滚），
+      留着会在右边留一条约 15px 的缝 */
+html {
+    scrollbar-gutter: auto;
+}
+
+/* 3. 地图页是一屏铺满的，不滚动。详情层是铺在它上面的独立滚动容器，
+      所以这里也不需要锁 body 滚动 */
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ------------------------------------------------------------
+   地图
+   ------------------------------------------------------------ */
+
+#map {
+    position: fixed;
+    inset: 0;
+    /* ECharts 要有尺寸的容器，否则 init() 直接报 "Can't get DOM width or height"。
+       ⚠️ 这里**不能**加 overflow: hidden —— tooltip 是挂在这个容器里的 DOM 节点，
+       裁了就没提示了（tooltip 自己那边有 confine: true 管边界） */
+}
+
+/* tooltip 的壳（底色、边框、圆角、磨砂）是在 map.js 的 option 里配的，
+   因为 ECharts 会给它写行内样式，普通 CSS 压不过。这里只管里面那行小字 */
+.map-tip__n {
+    color: var(--ink-2);
+    font-size: 11.5px;
+    letter-spacing: .06em;
+}
+
+.map-error {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: .1em;
+}
+
+/* ------------------------------------------------------------
+   顶栏
+
+   刻意**不复用**首页的 .bar：.bar 首屏是收在屏幕外的，靠 body.is-past
+   才滑下来，而地图页没有首屏、scrollY 恒为 0，那个类永远不会触发 ——
+   直接复用的话顶栏永远看不见。这里复制它的视觉，但常驻。
+   ------------------------------------------------------------ */
+
+.map-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    height: var(--bar-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--pad);
+    background: rgba(8, 8, 10, .74);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.map-bar__title {
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: .22em;
+    color: var(--ink);
+}
+
+.map-bar__back {
+    font-size: 12px;
+    letter-spacing: .16em;
+    color: var(--ink-2);
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: color .25s, border-color .25s;
+}
+
+.map-bar__back:hover {
+    color: var(--ink);
+    border-color: rgba(242, 240, 236, .34);
+}
+
+/* ------------------------------------------------------------
+   左下角：未归类作品入口
+   ------------------------------------------------------------ */
+
+.uncat {
+    position: fixed;
+    left: var(--pad);
+    bottom: clamp(20px, 4vh, 34px);
+    z-index: 100;
+    padding: 8px 16px;
+    /* button 默认用系统字体，不继承 body 的，得显式要一份 */
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: .12em;
+    color: var(--ink-2);
+    background: rgba(8, 8, 10, .6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+    /* 虚线：和「省份」那些实线入口区分开，一眼看出它不是地图上的一块 */
+    border: 1px dashed var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color .25s, border-color .25s;
+}
+
+.uncat:hover {
+    color: var(--ink);
+    border-color: rgba(242, 240, 236, .34);
+}
+
+/* 地图没画出来时 map.js 会给它加 hidden。这条不能省：上面那串作者样式
+   压得过浏览器默认的 [hidden]{display:none}，光加属性是藏不住的
+   （admin.css 里 .cover-actions .btn[hidden] 是同一个坑） */
+.uncat[hidden] {
+    display: none;
+}
+
+/* ============================================================
+   省份详情（铺满整屏的覆盖层）
+
+   层级：地图 auto -> 顶栏/未归类 100 -> 这里 160 -> 灯箱 200
+   -> 提示条 300。夹在中间是必须的：它得盖住顶栏，又得被灯箱盖住。
+   ============================================================ */
+
+.detail {
+    position: fixed;
+    inset: 0;
+    z-index: 160;
+    overflow-y: auto;
+    /* 地图页底色就是 --bg，详情层铺满之后下面的地图完全看不见了 ——
+       这是有意的（用户要的是「占满正屏幕」），所以不做什么半透明 */
+    background: var(--bg);
+    opacity: 0;
+    transform: translateY(14px);
+    /* 和 .side 那套一样的道理：光靠透明度藏不住，关着的详情层还在
+       Tab 顺序里，键盘能走到看不见的返回按钮上。visibility 才是真的「不在」，
+       但它不能立刻生效，会把这 0.38s 的入场一起切掉，所以延迟到动画跑完再翻 */
+    visibility: hidden;
+    transition: opacity .38s var(--ease), transform .38s var(--ease), visibility 0s linear .38s;
+}
+
+.detail.is-open {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    transition: opacity .38s var(--ease), transform .38s var(--ease), visibility 0s;
+}
+
+/* 内置的移动端滚动惯性（iOS）：详情层是唯一的滚动容器 */
+.detail {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ------------------------------------------------------------
+   Hero：最新那件作品的成片铺满，底部渐隐进底色
+   ------------------------------------------------------------ */
+
+.detail__hero {
+    position: relative;
+    height: clamp(300px, 52vh, 480px);
+    overflow: hidden;
+    /* 没有成片可放时（比如未归类一件都没有）不能是一片黑，
+       给个略微抬亮的底色，白字照样压得住 */
+    background: linear-gradient(160deg, #17171b, var(--bg));
+}
+
+.detail__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* 没图时 img 报错，src 是空的，这条避免破图图标 */
+    color: transparent;
+}
+
+/* 渐隐压在最上面：上缘压一点（否则左上角返回按钮在亮图上会糊），
+   下缘直接化进 --bg，标题那块才有对比度 */
+.detail__veil {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, rgba(8, 8, 10, .5), rgba(8, 8, 10, 0) 28%),
+        linear-gradient(to bottom, rgba(8, 8, 10, 0) 42%, rgba(8, 8, 10, .72) 72%, var(--bg) 100%);
+}
+
+/* 返回。**固定在视口左上角**，不跟着详情层滚 —— 照片墙可能很长，
+   滚到一半还得能退出去 */
+.detail__back {
+    position: fixed;
+    top: clamp(14px, 2.4vh, 22px);
+    left: var(--pad);
+    z-index: 1;
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-size: 17px;
+    color: var(--ink);
+    background: rgba(8, 8, 10, .5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background .25s, border-color .25s;
+}
+
+.detail__back:hover {
+    background: rgba(8, 8, 10, .76);
+    border-color: rgba(255, 255, 255, .3);
+}
+
+/* 右上角：这件作品横跨了几个省、这个省有几组 */
+.detail__pill {
+    position: absolute;
+    top: clamp(14px, 2.4vh, 22px);
+    right: var(--pad);
+    padding: 6px 14px;
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    color: var(--ink-2);
+    background: rgba(8, 8, 10, .5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 999px;
+}
+
+/* 标题块压在 Hero 下缘 */
+.detail__head {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 var(--pad) clamp(20px, 3.4vh, 34px);
+}
+
+.detail__date {
+    margin: 0 0 10px;
+    font-size: 11.5px;
+    letter-spacing: .2em;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 空元素也会占一行的高度（margin 还在），没日期时用 :empty 收掉 */
+.detail__date:empty,
+.detail__intro:empty {
+    display: none;
+}
+
+.detail__name {
+    margin: 0;
+    font-size: clamp(30px, 6vw, 46px);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: .04em;
+    color: var(--ink);
+}
+
+/* 省份介绍（后台可改）。省名是固定的，能变的只有这一行 */
+.detail__intro {
+    margin: 14px 0 0;
+    max-width: 34em;
+    font-size: 13.5px;
+    line-height: 1.9;
+    letter-spacing: .02em;
+    color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------
+   正文：统计 / 区块标题 / 照片墙
+   ------------------------------------------------------------ */
+
+.detail__body {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 var(--pad) 80px;
+}
+
+.detail__stats {
+    display: flex;
+    margin: 30px 0 0;
+}
+
+.detail__stats > div {
+    flex: 1;
+    min-width: 0;
+    padding: 0 18px;
+    border-left: 1px solid var(--line-soft);
+}
+
+.detail__stats > div:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.detail__stats dt {
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    color: var(--muted);
+}
+
+.detail__stats dd {
+    margin: 7px 0 0;
+    font-size: 15px;
+    letter-spacing: .04em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.detail__sec {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: clamp(34px, 6vh, 52px) 0 16px;
+}
+
+.detail__sec h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: .16em;
+    color: var(--ink);
+}
+
+.detail__updated {
+    font-size: 11px;
+    letter-spacing: .1em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   照片墙
+
+   两列。宽度靠 i % 6 的循环排出一张「宽 / 两条竖 / 宽 / 两条方」
+   的节奏，不是随机的 —— 随机那种每次刷新都不一样，拼图会散。
+
+   这里**不用**首页 .work 那套「按原图比例撑开」：墙上几十张图比例
+   各不相同，逐张撑开会把两列的高度差拉得没法看。统一裁成固定的几个
+   比例，视觉上才是一面墙。
+   ------------------------------------------------------------ */
+
+.detail__wall {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.dphoto {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    background: var(--ph);
+    border: 0;
+    border-radius: 12px;
+    cursor: zoom-in;
+}
+
+.dphoto__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* 节奏跟首页列表缩略图一致（4.5% / 0.9s） */
+    transition: transform .9s var(--ease), opacity .5s var(--ease);
+}
+
+/* 图是 loading="lazy" 的，没解码完先淡着，别一格一格地跳出来 */
+.dphoto__img:not(.is-loaded) {
+    opacity: 0;
+}
+
+.dphoto:hover .dphoto__img {
+    transform: scale(1.045);
+}
+
+.dphoto.is-wide {
+    grid-column: 1 / -1;
+    aspect-ratio: 16 / 10;
+}
+
+.dphoto.is-tall {
+    aspect-ratio: 3 / 4;
+}
+
+.dphoto.is-square {
+    aspect-ratio: 1 / 1;
+}
+
+.detail__empty {
+    margin: clamp(44px, 12vh, 96px) 0 0;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: .1em;
+    color: var(--muted);
+}
+
+/* ------------------------------------------------------------
+   窄屏
+   ------------------------------------------------------------ */
+
+@media (max-width: 768px) {
+    .detail__hero {
+        height: clamp(260px, 44vh, 380px);
+    }
+
+    .detail__stats > div {
+        padding: 0 12px;
+    }
+
+    .detail__stats dd {
+        font-size: 14px;
+    }
+
+    .detail__wall {
+        gap: 8px;
+    }
+}
+
+/* ------------------------------------------------------------
+   减少动态效果：详情层不做位移，直接出现
+   ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+    .detail {
+        transform: none;
+        transition: opacity .2s ease, visibility 0s linear .2s;
+    }
+
+    .detail.is-open {
+        transition: opacity .2s ease, visibility 0s;
+    }
+
+    .dphoto__img,
+    .dphoto:hover .dphoto__img {
+        transform: none;
+    }
+}

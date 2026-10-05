@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img" aria-label="暮色渐层">
+  <title>暮色渐层</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2=".9" y2="1">
+      <stop offset="0" stop-color="#E6E7EF"/>
+      <stop offset="1" stop-color="#A6ACC6"/>
+    </linearGradient>
+    <radialGradient id="hi" cx=".3" cy=".22" r=".68">
+      <stop offset="0" stop-color="#FBFCFF" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#FBFCFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vi" cx=".5" cy=".52" r=".78">
+      <stop offset=".45" stop-color="#3E4460" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3E4460" stop-opacity=".30"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <rect width="1600" height="1000" fill="url(#hi)"/>
+  <rect width="1600" height="1000" fill="url(#vi)"/>
+</svg>

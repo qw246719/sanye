@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>作品辑</title>
+    <meta name="theme-color" content="#08080A">
+    <meta name="description" content="作品辑。每一张，都从「差一点」开始。">
+    <link rel="stylesheet" href="css/gallery.css">
+</head>
+<body id="top">
+
+<!-- 页面上不出现站名，但文档需要一个 h1 撑住大纲，只给读屏用 -->
+<h1 class="sr-only">作品辑</h1>
+
+<!-- ============================================================
+     首屏：一整屏封面照，钉在顶部不动。
+     往下滚时照片逐渐化开、变暗、往下沉，下面的内容像一张纸
+     从底下盖上来把它压住（.flow 的圆角顶边）。
+     ============================================================ -->
+<section class="hero" id="hero">
+    <div class="hero__media" id="heroMedia">
+        <!-- 两层同一张图：底层锐利，上层预先糊好、只改透明度。
+             逐帧改 filter: blur() 要重新栅格化整屏，改 opacity 只走合成，便宜得多。 -->
+        <img class="hero__img" id="heroImg" src="/cover.jpg" alt="仰拍的三叶草丛和蓝天" fetchpriority="high" decoding="async">
+        <img class="hero__img hero__img--soft" id="heroSoft" src="/cover.jpg" alt="" aria-hidden="true">
+        <div class="hero__veil" id="heroVeil"></div>
+    </div>
+
+    <div class="hero__text" id="heroText">
+        <p class="hero__kicker">SELECTED WORKS</p>
+        <p class="hero__sub">每一张，都从「差一点」开始。</p>
+    </div>
+
+    <div class="hero__cue" aria-hidden="true">
+        <span class="hero__cue-line"></span>
+        <span>向下</span>
+    </div>
+</section>
+
+<!-- 顶栏浮在最上面，滚过首屏才滑下来 -->
+<header class="bar" id="bar">
+    <a class="bar__mark" href="#top" aria-label="回到顶部"><span class="bar__dot"></span></a>
+    <!-- 两个链接包一层：.bar 自己是 space-between，直接塞第三个元素会给摆到正中间 -->
+    <nav class="bar__links">
+        <a class="bar__link" href="map.html">作品地图</a>
+        <a class="bar__link" href="admin.html">后台管理</a>
+    </nav>
+</header>
+
+<!-- 首屏时 .bar 还收在屏幕外，没这个按钮就进不去地图。
+     滚过封面后 .bar 滑下来，它让位 —— 两个入口不同时出现（见 gallery.css） -->
+<a class="map-fab" href="map.html">作品地图</a>
+
+<main class="flow" id="flow">
+
+    <section class="works" id="works" aria-busy="true"></section>
+
+    <footer class="foot">
+        <div class="foot__meta">
+            <a href="#top">回到顶部 ↑</a>
+            <a href="map.html">作品地图</a>
+            <a href="admin.html">后台管理</a>
+        </div>
+    </footer>
+
+</main>
+
+<!-- ============================================================
+     灯箱。必须是 .flow 的兄弟节点：祖先一旦有 filter / backdrop-filter
+     就会成为包含块，里面的 position: fixed 就不再相对视口定位了。
+     （.flow 现在两样都占：入场动画是 filter，磨砂底是 backdrop-filter。）
+     ============================================================ -->
+<div class="lb" id="lb" hidden>
+    <div class="lb__backdrop" id="lbBackdrop"></div>
+
+    <figure class="lb__stage">
+        <img class="lb__img" id="lbImg" alt="">
+    </figure>
+
+    <figcaption class="lb__cap" id="lbCap">
+        <span class="lb__title" id="lbTitle"></span>
+        <span class="lb__desc" id="lbDesc"></span>
+        <span class="lb__meta"><span id="lbProv"></span><span class="lb__dot">·</span><span id="lbIdx"></span></span>
+    </figcaption>
+
+    <button class="lb__nav lb__nav--prev" id="lbPrev" type="button" aria-label="上一张">‹</button>
+    <button class="lb__nav lb__nav--next" id="lbNext" type="button" aria-label="下一张">›</button>
+    <button class="lb__close" id="lbClose" type="button" aria-label="关闭">✕</button>
+    <p class="lb__hint">← → 切换 · ESC 关闭</p>
+</div>
+
+<script type="module" src="/js/gallery.js"></script>
+</body>
+</html>

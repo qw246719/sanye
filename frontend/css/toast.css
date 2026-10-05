@@ -1,0 +1,53 @@
+/* ============================================================
+   顶部提示条（js/api.js 的 toast() 创建的那两个元素）
+
+   单独一份是因为用它的一共两个页面，而这两页引的 CSS 没有交集：
+   后台引 style.css、地图页引 gallery.css。原先它长在 style.css 里，
+   地图页不引那份就成了裸 DOM —— 一个没有定位的 div 会掉进正常流里，
+   把整页撑开。
+
+   依赖的变量：--surface / --border / --shadow / --accent / --danger。
+   地图页引的 gallery.css 里没有 --shadow，所以下面给了回退值。
+   ============================================================ */
+
+.toast-box {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    /* 地图页的灯箱是 200，提示条得压在它上面 */
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 11px 20px;
+    border-radius: 999px;
+    /* var() 的第二个参数是回退值，gallery.css 那边没有 --shadow */
+    background: var(--surface, #101014);
+    border: 1px solid var(--border, rgba(242, 240, 236, .13));
+    box-shadow: var(--shadow, 0 18px 50px rgba(0, 0, 0, .6));
+    font-size: 13px;
+    animation: toast-in .22s ease-out;
+}
+
+.toast--ok {
+    border-color: rgba(155, 196, 111, .5);
+    color: var(--accent, #9BC46F);
+}
+
+.toast--err {
+    border-color: rgba(229, 118, 106, .5);
+    color: var(--danger, #E5766A);
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}

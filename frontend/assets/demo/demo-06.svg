@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1050" width="1400" height="1050" role="img" aria-label="陶土静物">
+  <title>陶土静物</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2=".9" y2="1">
+      <stop offset="0" stop-color="#F3E1D3"/>
+      <stop offset="1" stop-color="#C8997B"/>
+    </linearGradient>
+    <radialGradient id="hi" cx=".3" cy=".22" r=".68">
+      <stop offset="0" stop-color="#FFF7F0" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#FFF7F0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vi" cx=".5" cy=".52" r=".78">
+      <stop offset=".45" stop-color="#7A4A2E" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7A4A2E" stop-opacity=".30"/>
+    </radialGradient>
+  </defs>
+  <rect width="1400" height="1050" fill="url(#bg)"/>
+  <rect width="1400" height="1050" fill="url(#hi)"/>
+  <rect width="1400" height="1050" fill="url(#vi)"/>
+</svg>

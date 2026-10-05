@@ -1,0 +1,326 @@
+/* ============================================================
+   三叶修图 · 公共基础样式（无框架，原生 CSS）
+
+   这里只放全站共用的东西：配色变量、顶栏、按钮表单、状态块、Toast。
+   后台管理页在它之上叠加 admin.css；作品辑页（index.html）是独立的一套
+   gallery.css，两边共用的是同一套黑。
+
+   和 gallery.css 的取值保持一致 —— 改配色要两处一起改。
+   ============================================================ */
+
+:root {
+    --bg: #08080A;
+    --surface: #101014;        /* 面板底，比页面黑亮一档才看得出是个块 */
+    --surface-2: #17171C;
+    --border: rgba(242, 240, 236, .13);
+    --border-strong: rgba(242, 240, 236, .3);
+
+    --text: #F2F0EC;
+    --muted: #8C8880;
+    --accent: #9BC46F;         /* 取自封面那丛三叶草的绿 */
+    --accent-ink: #0A0C07;     /* 压在 accent 上当文字色用 */
+    --accent-soft: rgba(155, 196, 111, .16);
+    --danger: #E5766A;         /* 黑底上要提亮，原来的深红看不清 */
+
+    --photo-bg: #131317;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 18px 50px rgba(0, 0, 0, .6);
+
+    --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --header-h: 58px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+}
+
+button {
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+}
+
+::selection {
+    background: var(--accent-soft);
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+}
+
+/* ---------------- 布局 ---------------- */
+
+.container {
+    width: min(1200px, 100% - 48px);
+    margin: 0 auto;
+}
+
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(8, 8, 10, .78);
+    backdrop-filter: blur(16px) saturate(130%);
+    -webkit-backdrop-filter: blur(16px) saturate(130%);
+    border-bottom: 1px solid var(--border);
+}
+
+.site-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: var(--header-h);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+/* 只留一个绿点，外面一圈很淡的光环 */
+.logo__mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 5px var(--accent-soft);
+    transition: transform .2s;
+}
+
+.logo:hover .logo__mark {
+    transform: scale(1.1);
+}
+
+.site-nav {
+    display: flex;
+    gap: clamp(16px, 2.4vw, 26px);
+}
+
+.site-nav a {
+    padding: 4px 0;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: .06em;
+    border-bottom: 1px solid transparent;
+    transition: color .25s, border-color .25s;
+}
+
+.site-nav a:hover {
+    color: var(--text);
+}
+
+.site-nav a.is-active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+/* ---------------- 状态块（加载 / 空 / 报错） ---------------- */
+
+.state {
+    text-align: center;
+    padding: 64px 20px;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+.state__title {
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.state button {
+    margin-top: 14px;
+}
+
+/* 骨架屏 */
+.skeleton {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.skeleton__box,
+.skeleton__bar {
+    background: linear-gradient(90deg, #17171C 25%, #202027 37%, #17171C 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.3s ease-in-out infinite;
+}
+
+.skeleton__box {
+    aspect-ratio: 4 / 3;
+}
+
+.skeleton__bar {
+    height: 14px;
+    margin: 16px;
+    width: 55%;
+    border-radius: 6px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0 50%;
+    }
+}
+
+/* ---------------- 通用按钮 / 表单 ---------------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 550;
+    transition: background .18s, border-color .18s, opacity .18s;
+}
+
+.btn:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: #1F1F26;
+}
+
+.btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.btn--primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+.btn--primary:hover:not(:disabled) {
+    background: #ADCF85;
+    border-color: #ADCF85;
+}
+
+.btn--danger {
+    color: var(--danger);
+    border-color: rgba(229, 118, 106, .38);
+    background: rgba(229, 118, 106, .08);
+}
+
+.btn--danger:hover:not(:disabled) {
+    background: rgba(229, 118, 106, .16);
+    border-color: rgba(229, 118, 106, .55);
+}
+
+.btn--sm {
+    padding: 6px 13px;
+    font-size: 13px;
+}
+
+.field {
+    margin-bottom: 18px;
+}
+
+.field > label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.input,
+.select,
+input[type="text"],
+select {
+    width: 100%;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .18s, box-shadow .18s;
+}
+
+.input::placeholder {
+    color: #5C5952;
+}
+
+.input:focus,
+.select:focus,
+input[type="text"]:focus,
+select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 下拉展开的那一列是系统画的，不写这行在某些浏览器上会是白底黑字的系统色 */
+select option {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+input[type="file"] {
+    width: 100%;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+    border-color: var(--border-strong);
+}
+
+/* Toast 挪到了 css/toast.css —— 地图页也用 toast，但它引的是 gallery.css，
+   和这份没有交集，放在这里那边就拿不到样式 */
+
+@media (max-width: 600px) {
+    .container {
+        width: calc(100% - 32px);
+    }
+}

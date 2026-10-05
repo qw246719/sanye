@@ -1,0 +1,26 @@
+server:
+  # 别改这个：vite.config.js 的 proxy 和 README 都按 8080 来；
+  # 5173~5175 是 Vite 开发服务器自己占的，改成那一段必然撞车。
+  port: 8080
+
+spring:
+  application:
+    name: sanye-showcase
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 24MB
+
+app:
+  # 图片存放目录（相对启动目录）
+  upload-dir: ./uploads
+  # 作品元数据 JSON 文件
+  data-file: ./data/works.json
+  # 站点配置（首屏封面 + 文字 + 字体）JSON 文件
+  site-config-file: ./data/site.json
+  # 省份介绍 JSON 文件（省名 -> 一段文字）
+  province-note-file: ./data/province-notes.json
+
+logging:
+  level:
+    com.sanye: INFO

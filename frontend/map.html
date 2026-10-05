@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>作品地图</title>
+    <meta name="theme-color" content="#08080A">
+    <meta name="description" content="按省份看作品。点亮的省里有照片。">
+    <!-- 刻意和首页共用这一份：地图页要的配色变量、字体、缓动、以及 .lb 那整套
+         灯箱样式都在里面，在这里再抄一遍变量是一定会漂的。
+         map.css 只写地图页自己的东西，外加三处必要的覆盖。 -->
+    <link rel="stylesheet" href="css/gallery.css">
+    <link rel="stylesheet" href="css/toast.css">
+    <link rel="stylesheet" href="css/map.css">
+</head>
+<body>
+
+<!-- 页面上不出现站名，但文档要一个 h1 撑住大纲，只给读屏用 -->
+<h1 class="sr-only">作品地图</h1>
+
+<!-- ECharts 画在这上面 -->
+<div id="map"></div>
+
+<header class="map-bar">
+    <p class="map-bar__title">作品地图</p>
+    <a class="map-bar__back" href="index.html">← 作品列表</a>
+</header>
+
+<!-- 一个省都没选的作品全在这儿。数字由 map.js 填 -->
+<button class="uncat" id="uncatEntry" type="button">未归类作品 (0)</button>
+
+<!-- ============================================================
+     省份详情。点地图上点亮的省就铺满整屏，点「未归类」也走这里
+     （那种情况没有省名，标题就是「未归类」，介绍那行不出现）。
+
+     是**覆盖层**不是新页面：地图的缩放/平移状态就这么留在下面，
+     返回时还是刚才那张图，不用重画也不用重新拉数据。
+
+     没有「关闭」按钮，左上角那个是返回 —— 它同时也是浏览器返回，
+     手机上的返回手势能直接关掉（history 那条线见 map.js）。
+     ============================================================ -->
+<section class="detail" id="detail" role="dialog" aria-modal="true" aria-label="省份作品" hidden>
+
+    <div class="detail__hero" id="detailHero">
+        <img class="detail__img" id="detailImg" alt="" decoding="async">
+        <div class="detail__veil"></div>
+
+        <button class="detail__back" id="detailBack" type="button" aria-label="返回地图">←</button>
+        <span class="detail__pill" id="detailPill"></span>
+
+        <div class="detail__head">
+            <p class="detail__date" id="detailDate"></p>
+            <h2 class="detail__name" id="detailName"></h2>
+            <p class="detail__intro" id="detailIntro"></p>
+        </div>
+    </div>
+
+    <div class="detail__body">
+        <dl class="detail__stats" id="detailStats"></dl>
+
+        <div class="detail__sec">
+            <h3>省份影像</h3>
+            <span class="detail__updated" id="detailUpdated"></span>
+        </div>
+
+        <div class="detail__wall" id="detailWall"></div>
+    </div>
+
+</section>
+
+<!-- ============================================================
+     灯箱。外观和摆位跟首页那套共用（gallery.css 的 .lb + js/lightbox.js
+     的三个摆位函数），但这里只有单张：没有左右箭头、没有从缩略图起飞的动画、
+     提示语也只写 ESC。
+
+     必须是 body 的直接子节点：祖先一旦有 filter / backdrop-filter
+     就成了包含块，里面的 position: fixed 就不再相对视口定位
+     ============================================================ -->
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="作品大图" hidden>
+    <div class="lb__backdrop" id="lbBackdrop"></div>
+
+    <figure class="lb__stage">
+        <img class="lb__img" id="lbImg" alt="">
+    </figure>
+
+    <figcaption class="lb__cap" id="lbCap">
+        <span class="lb__title" id="lbTitle"></span>
+        <span class="lb__desc" id="lbDesc"></span>
+        <span class="lb__meta"><span id="lbProv"></span></span>
+    </figcaption>
+
+    <button class="lb__close" id="lbClose" type="button" aria-label="关闭">✕</button>
+    <p class="lb__hint">ESC 关闭</p>
+</div>
+
+<script type="module" src="/js/map.js"></script>
+</body>
+</html>
