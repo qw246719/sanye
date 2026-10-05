@@ -301,13 +301,20 @@ body {
 /* 标题块压在 Hero 下缘。
    **不要 max-width + margin: 0 auto** —— 面板宽 60vw 时它比 760px 宽，
    auto 外边距会把整块居中，在 --pad 之外又叠一层内缩，
-   标题就跟左上角返回按钮对不齐了。内容一律贴 --pad 靠左 */
+   文字就不在左缘那条线上了。
+
+   这里**故意不跟正文共用 --pad**：Hero 是铺满整块面板的图，省名和介绍
+   站在它自己的左缘，比下面那列正文更贴边（1440 屏上 26px vs 72px）。
+   正文（.detail__body 里的统计/区块标题/照片墙）仍然走 --pad，
+   两边错开是有意的，别看到数值不一样就"顺手统一"。 */
 .detail__head {
+    --head-pad: clamp(20px, 1.8vw, 30px);
+
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 0 var(--pad) clamp(20px, 3.4vh, 34px);
+    padding: 0 var(--head-pad) clamp(20px, 3.4vh, 34px);
 }
 
 .detail__date {
