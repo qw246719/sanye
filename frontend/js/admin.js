@@ -263,7 +263,7 @@ function loadCover() {
 function renderCover(url) {
     coverUrl = url || '';
     coverPreviewEl.innerHTML =
-        `<img src="${escapeHtml(assetUrl(coverUrl) || '/cover.jpg')}" alt="当前封面预览" decoding="async">`;
+        `<img src="${escapeHtml(assetUrl(coverUrl) || (import.meta.env.BASE_URL + 'cover.jpg'))}" alt="当前封面预览" decoding="async">`;
     coverResetBtn.hidden = !coverUrl;
 }
 

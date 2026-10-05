@@ -184,7 +184,7 @@ init();
 async function init() {
     let geo;
     try {
-        const res = await fetch('/china.json');
+        const res = await fetch(import.meta.env.BASE_URL + 'china.json');
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}`);
         }

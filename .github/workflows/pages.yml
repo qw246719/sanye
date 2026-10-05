@@ -1,0 +1,65 @@
+# 构建前端并发布到 GitHub Pages。
+#
+# 发布地址：https://qw246719.github.io/sanye/
+# 触发时机：push 到 main（及手动触发）。每推一次就自动重新部署。
+#
+# ⚠️ 首次启用要在仓库设置里开一次 Pages：
+#   Settings → Pages → Source 选 "GitHub Actions" → Save。
+#   之后每次 push main 都会自动构建并上线。
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 给 GitHub Pages 的权限。需要两个写权限 + 部署用的 id-token。
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一条部署：新的 push 进来，旧的直接取消。
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 仓库是 monorepo（backend + frontend），只装前端那半。
+      # --base=/sanye/ 是关键：部署在子路径下，所有资源路径都要带这个前缀，
+      # 否则绝对路径（/cover.jpg、/js/gallery.js）会指到用户名站点的根上。
+      - name: Install & build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build -- --base=/sanye/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

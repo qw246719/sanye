@@ -246,8 +246,9 @@ function swapHero(url) {
         const back = () => {
             heroImg.removeEventListener('error', back);
             heroSoft.removeEventListener('error', back);
-            heroImg.src = '/cover.jpg';
-            heroSoft.src = '/cover.jpg';
+            const cover = import.meta.env.BASE_URL + 'cover.jpg';
+            heroImg.src = cover;
+            heroSoft.src = cover;
             heroImg.alt = '仰拍的三叶草丛和蓝天';
             heroImg.removeAttribute('aria-hidden');
             revealHero();
