@@ -168,34 +168,49 @@ body {
 }
 
 /* ============================================================
-   省份详情（铺满整屏的覆盖层）
+   省份详情（从右侧拉出的半屏面板）
 
    层级：地图 auto -> 顶栏/未归类 100 -> 这里 160 -> 灯箱 200
    -> 提示条 300。夹在中间是必须的：它得盖住顶栏，又得被灯箱盖住。
+
+   只占右半边，左边的地图仍然露着 —— 面板开着的时候可以直接点别的省，
+   map.js 那边本来就会把内容换掉（history 也不会再压第二条）。
    ============================================================ */
 
 .detail {
+    /* 面板宽度：比半屏再宽一点（0.6 视口），上下限兜住极端屏宽。
+       窄屏在下面的媒体查询里整个覆盖成 100vw —— 手机上右半边没法定居 */
+    --detail-w: clamp(460px, 60vw, 940px);
+
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--detail-w);
     z-index: 160;
     overflow-y: auto;
-    /* 地图页底色就是 --bg，详情层铺满之后下面的地图完全看不见了 ——
-       这是有意的（用户要的是「占满正屏幕」），所以不做什么半透明 */
+    /* 地图只被盖住右半边，所以这里的底色必须是不透明的，
+       否则文字会和左边透出来的地图描边叠在一起 */
     background: var(--bg);
+    /* 左缘一道细边 + 投影，把面板和左边的地图分开 */
+    border-left: 1px solid var(--line);
+    box-shadow: -30px 0 70px rgba(0, 0, 0, .6);
     opacity: 0;
-    transform: translateY(14px);
-    /* 和 .side 那套一样的道理：光靠透明度藏不住，关着的详情层还在
-       Tab 顺序里，键盘能走到看不见的返回按钮上。visibility 才是真的「不在」，
-       但它不能立刻生效，会把这 0.38s 的入场一起切掉，所以延迟到动画跑完再翻 */
+    /* ⚠️ 这里**刻意不做位移**：.detail__back 是 position: fixed、靠视口定位的，
+       而 .detail 只要带上 transform（包括 translate/scale 这些独立属性）就成了
+       它的包含块 —— 按钮会改成相对面板定位，并跟着面板内容一起滚走。
+       所以入场只淡入。同理，animation 也别往这一层加 */
+    /* 光靠透明度藏不住：关着的面板还在 Tab 顺序里，键盘能走到看不见的返回按钮上。
+       visibility 才是真的「不在」，但它不能立刻生效、会把这 .34s 的淡入一起切掉，
+       所以延迟到淡入跑完再翻 */
     visibility: hidden;
-    transition: opacity .38s var(--ease), transform .38s var(--ease), visibility 0s linear .38s;
+    transition: opacity .34s var(--ease), visibility 0s linear .34s;
 }
 
 .detail.is-open {
     opacity: 1;
-    transform: none;
     visibility: visible;
-    transition: opacity .38s var(--ease), transform .38s var(--ease), visibility 0s;
+    transition: opacity .34s var(--ease), visibility 0s;
 }
 
 /* 内置的移动端滚动惯性（iOS）：详情层是唯一的滚动容器 */
@@ -236,12 +251,15 @@ body {
         linear-gradient(to bottom, rgba(8, 8, 10, 0) 42%, rgba(8, 8, 10, .72) 72%, var(--bg) 100%);
 }
 
-/* 返回。**固定在视口左上角**，不跟着详情层滚 —— 照片墙可能很长，
-   滚到一半还得能退出去 */
+/* 返回。**固定在面板左上角**，不跟着详情层滚 —— 照片墙可能很长，
+   滚到一半还得能退出去。
+   面板贴视口右边、宽 --detail-w，所以面板左缘 = 100vw - --detail-w，
+   按钮钉在这个左缘再往里一个 --pad。**不能写 left: var(--pad)** ——
+   那会跑到视口左边、盖在露出来的地图上（fixed 是相对视口算的） */
 .detail__back {
     position: fixed;
     top: clamp(14px, 2.4vh, 22px);
-    left: var(--pad);
+    left: calc(100vw - var(--detail-w) + var(--pad));
     z-index: 1;
     width: 38px;
     height: 38px;
@@ -461,6 +479,13 @@ body {
    ------------------------------------------------------------ */
 
 @media (max-width: 768px) {
+    /* 窄屏上没有「左半边地图」可言，面板直接占满 ——
+       右半屏在手机上只剩 190px，照片墙和标题都放不下。
+       返回按钮的 left 是用 --detail-w 算的，这里改一个变量它就跟着对 */
+    .detail {
+        --detail-w: 100vw;
+    }
+
     .detail__hero {
         height: clamp(260px, 44vh, 380px);
     }
@@ -479,12 +504,11 @@ body {
 }
 
 /* ------------------------------------------------------------
-   减少动态效果：详情层不做位移，直接出现
+   减少动态效果：详情层淡入得更快（本来就没有位移动画）
    ------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
     .detail {
-        transform: none;
         transition: opacity .2s ease, visibility 0s linear .2s;
     }
 
