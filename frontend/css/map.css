@@ -6,7 +6,99 @@
    页面上没有 style.css，所以那边独有的 --radius / --surface 之类
    在这儿是不存在的，用到圆角就写死数值，别写 var(--radius-sm)，
    那种变量找不到值会让整条 border-radius 声明作废、圆角悄没声变成 0。
+   （唯一的例外是下面那个 --accent-lite，见它的注释。）
    ============================================================ */
+
+/* 地图页的一处颜色补充。--accent 还是 gallery.css 那一份，canvas 里的
+   省份也读它；这里多一个提亮过的绿，专给黑底上的「一点高光」用 ——
+   #9BC46F 大面积铺在黑上会发灰，做小面积的点（顶栏那个点、统计里的数字、
+   悬停描边）时反而要亮一档才立得住。
+   只在地图页定义，不动 gallery.css：首页那份配色是定过的。 */
+:root {
+    --accent-lite: #B7DD8A;
+}
+
+/* ------------------------------------------------------------
+   页面底色
+
+   原来就是一块 #08080A，从顶到最后一条边都一样，整页会显得很平。
+   这里垫一层很淡的光：中间偏上一团绿（呼应被点亮的省份）、右上角
+   一团冷色、左下角一点点暖，最后四周压一圈暗角把视线收进地图里。
+
+   全部透明度都在 .08 以下 —— 要的是「有深度」，不是「有颜色」。
+   照片和那点亮起来的省还是唯一的主角，这层只是不让它们浮在虚空里。
+
+   挂在 body::before 上而不是 #map 上：#map 是 ECharts 的容器，
+   尺寸会被反复读；canvas 本身是透明的，垫在它下面照样透得出来。
+   #map 给了 z-index: 1，稳稳压在这层之上。 */
+body::before {
+    content: '';
+    position: fixed;
+    /* 四下多铺 10%：光晕是椭圆，铺满容器边角才不会有硬边 */
+    inset: -10%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(56% 50% at 46% 40%, rgba(155, 196, 111, .1), transparent 70%),
+        radial-gradient(46% 44% at 84% 12%, rgba(96, 132, 178, .08), transparent 72%),
+        radial-gradient(60% 56% at 10% 90%, rgba(186, 138, 96, .055), transparent 70%),
+        radial-gradient(120% 110% at 50% 46%, transparent 38%, rgba(0, 0, 0, .62) 100%);
+    animation: ambientIn 1.6s var(--ease) both;
+}
+
+@keyframes ambientIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ------------------------------------------------------------
+   载入态
+
+   地图数据到之前页面上什么都没有，就是一块黑。给一个跳动的点 + 两个字，
+   renderMap() / fail() 会给它加 .is-gone 收掉。
+
+   写死在 HTML 里而不是 JS 插进去 —— JS 要是整个挂了，至少还留得下一句话。 */
+.boot {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 0;
+    font-size: 11.5px;
+    letter-spacing: .3em;
+    /* 字距会在最后一个字后面也留一份，视觉上就不居中了，补回来 */
+    text-indent: .3em;
+    color: var(--muted);
+    animation: bootIn .9s var(--ease) .15s both;
+    transition: opacity .55s var(--ease), visibility 0s linear .55s;
+}
+
+.boot.is-gone {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.boot__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-lite);
+    animation: bootPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes bootIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes bootPulse {
+    0%, 100% { opacity: .2; transform: scale(.7); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
 
 /* ------------------------------------------------------------
    对 gallery.css 的三处必要覆盖。都是实测会咬人的，不是洁癖
@@ -59,9 +151,30 @@ body {
 #map {
     position: fixed;
     inset: 0;
+    /* 压在 body::before 那层光晕上面 */
+    z-index: 1;
     /* ECharts 要有尺寸的容器，否则 init() 直接报 "Can't get DOM width or height"。
        ⚠️ 这里**不能**加 overflow: hidden —— tooltip 是挂在这个容器里的 DOM 节点，
        裁了就没提示了（tooltip 自己那边有 confine: true 管边界） */
+}
+
+/* 地图是画完才淡进来的（map.js 在 renderMap 之后加这个类）。
+   只做透明度、不做缩放：这一层是 position: fixed，又是 ECharts 反复读尺寸的
+   容器，别给它留任何有值的 transform。
+   类只由 JS 加，所以脚本整个挂掉时这里就是默认的 opacity: 1，地图照样看得见 */
+#map.is-ready {
+    animation: mapIn 1.15s var(--ease) both;
+}
+
+@keyframes mapIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 悬停在「有作品的省」上（map.js 按 ECharts 的 mouseover 加这个类）——
+   那些省点得开，光标得说出来 */
+#map.is-hot {
+    cursor: pointer;
 }
 
 /* tooltip 的壳（底色、边框、圆角、磨砂）是在 map.js 的 option 里配的，
@@ -70,6 +183,19 @@ body {
     color: var(--ink-2);
     font-size: 11.5px;
     letter-spacing: .06em;
+}
+
+/* 有作品的省，省名前点一个小绿点（map.js 的 formatter 拼进来的）。
+   提示框里就这一处颜色，省名本身别上色 —— 一列白字里那个点就够了 */
+.map-tip__dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 7px;
+    vertical-align: 1px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(155, 196, 111, .75);
 }
 
 .map-error {
@@ -102,17 +228,44 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--pad);
-    background: rgba(8, 8, 10, .74);
+    background: rgba(8, 8, 10, .78);
     -webkit-backdrop-filter: blur(20px) saturate(1.3);
     backdrop-filter: blur(20px) saturate(1.3);
-    border-bottom: 1px solid var(--line-soft);
+    /* 原来是 border-bottom 一条等宽细线 —— 顶栏下面是一条横贯全屏的硬边，
+       像给页面盖了个盖子。改成把整块（连磨砂一起）从下往上擦掉：
+       顶栏就那么化进地图里，没有边。mask 会连 backdrop-filter 一起裁，
+       所以底下那条模糊带也不会留一道硬边 */
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    animation: barIn .8s var(--ease) both;
 }
 
+@keyframes barIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    /* 收在 none 上：这一层是 fixed，留着有值的 transform 会给里面的
+       fixed 元素（这里暂时没有，但别埋雷）当包含块 */
+    to { opacity: 1; transform: none; }
+}
+
+/* 站名左边那个绿点。首页那点绿来自封面上的三叶草，地图页没有照片可依，
+   就用它顶上，整页唯一一处常驻的彩色 */
 .map-bar__title {
     margin: 0;
     font-size: 13px;
     letter-spacing: .22em;
     color: var(--ink);
+}
+
+.map-bar__title::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 11px;
+    vertical-align: 2px;
+    border-radius: 50%;
+    background: var(--accent-lite);
+    box-shadow: 0 0 10px rgba(155, 196, 111, .85);
 }
 
 .map-bar__back {
@@ -122,11 +275,12 @@ body {
     padding: 6px 14px;
     border: 1px solid var(--line);
     border-radius: 999px;
-    transition: color .25s, border-color .25s;
+    transition: color .25s, border-color .25s, background .25s;
 }
 
 .map-bar__back:hover {
     color: var(--ink);
+    background: rgba(242, 240, 236, .05);
     border-color: rgba(242, 240, 236, .34);
 }
 
@@ -152,12 +306,14 @@ body {
     border: 1px dashed var(--line);
     border-radius: 999px;
     cursor: pointer;
-    transition: color .25s, border-color .25s;
+    transition: color .25s, border-color .25s, background .25s;
+    animation: riseIn .9s var(--ease) .35s both;
 }
 
 .uncat:hover {
     color: var(--ink);
-    border-color: rgba(242, 240, 236, .34);
+    background: rgba(155, 196, 111, .07);
+    border-color: rgba(155, 196, 111, .5);
 }
 
 /* 地图没画出来时 map.js 会给它加 hidden。这条不能省：上面那串作者样式
@@ -196,8 +352,10 @@ body {
     z-index: 160;
     overflow-y: auto;
     /* 地图只被盖住右半边，所以这里的底色必须是不透明的，
-       否则文字会和左边透出来的地图描边叠在一起 */
-    background: var(--bg);
+       否则文字会和左边透出来的地图描边叠在一起。
+       不用 --bg 一块平涂：从上往下压一点点色差，让面板和它自己的
+       Hero 接得上（纯平涂时 Hero 下缘那条线会显得很生硬） */
+    background: linear-gradient(180deg, #0B0B0F, var(--bg) 32%);
     /* 左缘一道细边 + 投影，把面板和左边的地图分开 */
     border-left: 1px solid var(--line);
     box-shadow: -30px 0 70px rgba(0, 0, 0, .6);
@@ -237,8 +395,13 @@ body {
     height: clamp(300px, 52vh, 480px);
     overflow: hidden;
     /* 没传背景图时（后台没设置过、或者一个省一件作品都没有）不能是一片黑，
-       给个略微抬亮的底色，白字照样压得住 */
-    background: linear-gradient(160deg, #17171b, var(--bg));
+       给个略微抬亮的底色，白字照样压得住。
+       跟 body::before 同一套路数：一团绿、一团冷色垫在斜向渐变上，
+       一个什么都没有的省看着也不是「没加载完」 */
+    background:
+        radial-gradient(80% 62% at 22% 16%, rgba(155, 196, 111, .1), transparent 68%),
+        radial-gradient(66% 66% at 86% 6%, rgba(96, 132, 178, .08), transparent 70%),
+        linear-gradient(160deg, #191920, var(--bg));
 }
 
 .detail__img {
@@ -249,6 +412,19 @@ body {
     object-fit: cover;
     /* 没图时 img 报错，src 是空的，这条避免破图图标 */
     color: transparent;
+    /* 背景图不是「啪」地出现：淡进来 + 从 1.05 慢慢退回 1（5.5s），
+       像镜头轻轻推了一下。收尾停在 scale(1) 上没关系 —— 它是个 img，
+       底下没有 fixed 元素可影响。
+       transform-origin 稍微偏下，视觉上是从省名那一带动起来的 */
+    opacity: 0;
+    transform: scale(1.05);
+    transform-origin: 50% 62%;
+    transition: opacity .85s var(--ease), transform 5.5s var(--ease);
+}
+
+.detail.is-open .detail__img {
+    opacity: 1;
+    transform: scale(1);
 }
 
 /* 渐隐压在最上面：上缘压一点（否则左上角返回按钮在亮图上会糊），
@@ -257,8 +433,9 @@ body {
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to bottom, rgba(8, 8, 10, .5), rgba(8, 8, 10, 0) 28%),
-        linear-gradient(to bottom, rgba(8, 8, 10, 0) 42%, rgba(8, 8, 10, .72) 72%, var(--bg) 100%);
+        linear-gradient(to bottom, rgba(8, 8, 10, .52), rgba(8, 8, 10, 0) 30%),
+        radial-gradient(120% 90% at 50% 34%, rgba(8, 8, 10, 0) 42%, rgba(8, 8, 10, .5) 100%),
+        linear-gradient(to bottom, rgba(8, 8, 10, 0) 40%, rgba(8, 8, 10, .74) 72%, var(--bg) 100%);
 }
 
 /* 返回。**固定在面板左上角**，不跟着详情层滚 —— 照片墙可能很长，
@@ -361,9 +538,55 @@ body {
    ------------------------------------------------------------ */
 
 /* 同样不居中。这里给的是正文那条 --pad：
-   区块标题和照片墙贴它，跟左上角的返回按钮一条竖线 */
+   区块标题和照片墙贴它，跟左上角的返回按钮一条竖线。
+   顶上再垫一层很淡的绿：Hero 下缘化进底色之后，正文这一段不至于是一块死黑 */
 .detail__body {
     padding: 0 var(--pad) 80px;
+    background: radial-gradient(72% 34% at 16% 0%, rgba(155, 196, 111, .055), transparent 72%);
+}
+
+/* ------------------------------------------------------------
+   入场的错峰
+
+   面板这一层不能做位移（返回按钮是它里面的 fixed 元素），但面板**内容**
+   可以 —— 下面这些容器里都没有 fixed 元素，动它们不会波及按钮。
+   一块一块往上浮：Hero 里的日期/省名/介绍 -> 三格统计 -> 区块标题 -> 照片墙。
+
+   用 animation 而不是 transition：animation 跑完（fill: both，末帧
+   transform: none）就不留任何 transform，不用担心哪天有人往这些容器里
+   塞一个 fixed 子元素。--i 是这条链上的序号，没有它的元素按下标自己写，
+   照片墙那张由 map.js 逐张给（见 photoHtml）。
+   ------------------------------------------------------------ */
+
+@keyframes riseIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* 序号：Hero 三行 0/1/2，统计三格 3/4/5，区块标题 6，照片墙从 7 起 */
+.detail__head > *:nth-child(1) { --i: 0; }
+.detail__head > *:nth-child(2) { --i: 1; }
+.detail__head > *:nth-child(3) { --i: 2; }
+.detail__stats > *:nth-child(1) { --i: 3; }
+.detail__stats > *:nth-child(2) { --i: 4; }
+.detail__stats > *:nth-child(3) { --i: 5; }
+.detail__sec { --i: 6; }
+
+.detail.is-open .detail__head > *,
+.detail.is-open .detail__stats > *,
+.detail.is-open .detail__sec,
+.detail.is-open .detail__wall > * {
+    animation: riseIn .62s var(--ease) both;
+    /* --base 是等面板本身先淡进来一段，--step 是这一组里每格差多少 */
+    animation-delay: calc(var(--i, 0) * var(--step, 55ms) + var(--base, 110ms));
+}
+
+/* 照片墙自成一组：序号在 map.js 里从 0 起、封顶到 12，接在区块标题后面
+   （标题 440ms 上下落定）。步长比 Hero 那几行小 —— 几十张图按 55ms 排，
+   最后一张要等一秒多才出来，那不叫入场叫卡 */
+.detail__wall > * {
+    --step: 34ms;
+    --base: 500ms;
 }
 
 /* 只有统计这行要跟省名对齐，所以从正文那条线往左挪回 --head-pad 去。
@@ -400,6 +623,12 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* 「几组」是这个省唯一的量词，给它上色；两个日期留白，
+   三格里有一格有色，整行就不至于是一片灰 */
+.detail__stats > div:first-child dd {
+    color: var(--accent-lite);
+}
+
 /* 标题和「已更新」挨着靠左，不再 space-between ——
    面板最宽 940px，两端对齐会把这行日期甩到 700 多像素外，
    跟标题断成两块。整块内容一律从左缘读起 */
@@ -408,6 +637,17 @@ body {
     align-items: baseline;
     gap: 14px;
     margin: clamp(34px, 6vh, 52px) 0 16px;
+}
+
+/* 「已更新 …」右边拖一条化开的细线到面板右缘。就一小段渐隐的横线，
+   是这一节和上一节之间的分界；不写 border-bottom 是因为那会横贯整块，
+   在面板这么宽的地方显得像表格 */
+.detail__sec::after {
+    content: '';
+    align-self: center;
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--line), transparent 78%);
 }
 
 .detail__sec h3 {
@@ -452,6 +692,14 @@ body {
     border: 0;
     border-radius: 12px;
     cursor: zoom-in;
+    transition: box-shadow .45s var(--ease);
+}
+
+/* 悬停时除了图本身推近（见 .dphoto__img），外面再起一圈绿边。
+   只做 box-shadow，不动 border —— 加 border 会把 1px 算进盒子，
+   网格里那一格会跟着缩 */
+.dphoto:hover {
+    box-shadow: 0 0 0 1px rgba(155, 196, 111, .45), 0 16px 36px rgba(0, 0, 0, .6);
 }
 
 .dphoto__img {
@@ -537,6 +785,33 @@ body {
 
     .dphoto__img,
     .dphoto:hover .dphoto__img {
+        transform: none;
+    }
+
+    /* 这一节里新加的那些：底色的淡入、载入点、顶栏/未归类浮上来、
+       面板内容的错峰上浮。全部关掉要写成 animation: none ——
+       光把时长改成 0 的话，fill: both 会把这些元素钉在首帧（opacity: 0）上，
+       那就整块内容都看不见了 */
+    body::before,
+    .boot,
+    .boot__dot,
+    .map-bar,
+    .uncat,
+    #map.is-ready,
+    .detail.is-open .detail__head > *,
+    .detail.is-open .detail__stats > *,
+    .detail.is-open .detail__sec,
+    .detail.is-open .detail__wall > * {
+        animation: none;
+    }
+
+    /* 背景图只留淡入，不做那 5.5s 的推近 */
+    .detail__img {
+        transform: none;
+        transition: opacity .25s ease;
+    }
+
+    .detail.is-open .detail__img {
         transform: none;
     }
 }

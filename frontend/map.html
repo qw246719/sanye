@@ -21,6 +21,12 @@
 <!-- ECharts 画在这上面 -->
 <div id="map"></div>
 
+<!-- 地图数据到之前那一下。地图本身是空的、底色也是黑的，页面上要有东西
+     说明它正在来，而不是挂了。
+     map.js 在 renderMap() / fail() 里给它加 .is-gone 收掉。
+     写死在 HTML 里而不是 JS 插进去 —— 脚本要是整个挂掉，至少还留得下一句话 -->
+<p class="boot" id="boot" aria-hidden="true"><span class="boot__dot"></span>载入中</p>
+
 <header class="map-bar">
     <p class="map-bar__title">作品地图</p>
     <a class="map-bar__back" href="index.html">← 作品列表</a>

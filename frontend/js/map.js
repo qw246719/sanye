@@ -29,6 +29,7 @@ echarts.use([MapChart, TooltipComponent, CanvasRenderer]);
 
 const els = {
     map: document.getElementById('map'),
+    boot: document.getElementById('boot'),
     uncat: document.getElementById('uncatEntry'),
     detail: document.getElementById('detail'),
     detailImg: document.getElementById('detailImg'),
@@ -103,6 +104,12 @@ async function init() {
        整页会一直白着，而且什么错都不报 —— 地图本身跟作品一点关系都没有，
        没理由陪着一起等 */
     renderMap(geo);
+
+    /* 地图画完了：淡进来，同时把「载入中」收掉。
+       这个类由 JS 加（CSS 那边地图默认就是 opacity: 1），
+       所以脚本整个挂掉时地图照样看得见，只是没有淡入 */
+    els.map.classList.add('is-ready');
+    els.boot.classList.add('is-gone');
 
     /* 两趟请求并发，各成功各的、各失败各的。串起来 await 的话，
        作品那趟慢一点就白白多等一个往返，而这两份数据互不依赖 */
@@ -221,12 +228,39 @@ function seriesData() {
         name,
         value: list.length,
         itemStyle: {
-            areaColor: `rgba(${ACCENT_RGB}, .18)`,
-            borderColor: `rgba(${ACCENT_RGB}, .62)`,
-            shadowBlur: 18,
-            shadowColor: `rgba(${ACCENT_RGB}, .35)`,
+            /* 竖着的渐变：上缘亮、下缘沉下去。一块平涂的绿在整张描线地图上
+               显得像贴纸，有一点明暗就成了「亮起来的地区」 */
+            areaColor: greenGradient(.34, .13),
+            borderColor: `rgba(${ACCENT_RGB}, .7)`,
+            borderWidth: .8,
+            shadowBlur: 26,
+            shadowColor: `rgba(${ACCENT_RGB}, .42)`,
+        },
+        /* 每个点亮起来的省都得自己写一份 emphasis。
+           系列级那条 emphasis 是给描线省份用的（很淡的白），只用系列级的话，
+           鼠标一压到绿省上，颜色会被它整个盖成灰白 —— 越悬停越不像「有作品」 */
+        emphasis: {
+            itemStyle: {
+                areaColor: greenGradient(.55, .26),
+                borderColor: `rgba(${ACCENT_RGB}, .95)`,
+                borderWidth: 1.2,
+                shadowBlur: 36,
+                shadowColor: `rgba(${ACCENT_RGB}, .62)`,
+            },
         },
     }));
+}
+
+/** 省这块的竖向渐变，两个 stop 都用 --accent 拼出来（读的是同一份 RGB） */
+function greenGradient(topAlpha, bottomAlpha) {
+    return {
+        type: 'linear',
+        x: 0, y: 0, x2: 0, y2: 1,
+        colorStops: [
+            { offset: 0, color: `rgba(${ACCENT_RGB}, ${topAlpha})` },
+            { offset: 1, color: `rgba(${ACCENT_RGB}, ${bottomAlpha})` },
+        ],
+    };
 }
 
 /* ---------------- 地图 ---------------- */
@@ -263,7 +297,9 @@ function renderMap(geo) {
                 }
                 const list = byProvince.get(p.name);
                 const n = list ? `有 ${list.length} 组作品` : '暂无作品';
-                return `${escapeHtml(p.name)}<br><span class="map-tip__n">${n}</span>`;
+                // 有作品的省在省名前点一个小绿点，一眼看出哪个点得开
+                const dot = list ? '<span class="map-tip__dot"></span>' : '';
+                return `${dot}${escapeHtml(p.name)}<br><span class="map-tip__n">${n}</span>`;
             },
         },
         series: [{
@@ -276,19 +312,43 @@ function renderMap(geo) {
             selectedMode: false,
             zoom: 1.05,
             label: { show: false },
+            /* 起手（data 还是空表）和作品到货后那次 setOption 都走这套时长。
+               后一次是「哪个省亮起来」那一瞬，慢一点才看得出是在亮 */
+            animationDuration: 900,
+            animationEasing: 'cubicOut',
+            animationDurationUpdate: 750,
+            animationEasingUpdate: 'cubicOut',
             itemStyle: {
-                // 需求：省份不填色块，只留一道细描边
-                areaColor: 'transparent',
-                borderColor: 'rgba(242, 240, 236, .28)',
+                /* 不填色块这条没变，但不能是全透明 —— 全透明时整张地图只剩
+                   一层描线，漂在黑底上像一张网。给一点极淡的填充，陆地才
+                   成其为一块「地」，那些描线也才有东西可圈。
+
+                   色相特意偏暖（214, 202, 184，砂纸那种灰），跟底子上的
+                   冷色光晕分开：海是冷的，陆是暖的。全是中性灰的时候，
+                   整页就只剩深浅，怎么调都是一片黑 */
+                areaColor: 'rgba(214, 202, 184, .042)',
+                borderColor: 'rgba(242, 240, 236, .24)',
                 borderWidth: .6,
             },
             emphasis: {
+                /* 悬停某个省时，别的省淡下去 —— 不然鼠标扫过去，
+                   一整片描线都在那儿，看不出当前指的是哪一块 */
+                focus: 'self',
                 label: { show: true, color: '#F2F0EC', fontSize: 11 },
                 itemStyle: {
-                    areaColor: 'rgba(242, 240, 236, .06)',
-                    borderColor: 'rgba(242, 240, 236, .75)',
+                    areaColor: 'rgba(242, 240, 236, .085)',
+                    borderColor: 'rgba(242, 240, 236, .8)',
                     borderWidth: 1,
+                    shadowBlur: 16,
+                    shadowColor: 'rgba(242, 240, 236, .16)',
                 },
+            },
+            /* 别的省淡下去，但只淡到 .5 —— 再低整张图就没了。
+               描线本来就细，压到 .3 的时候页面上只剩悬停的那一块，
+               看着像地图加载失败 */
+            blur: {
+                itemStyle: { opacity: .5 },
+                label: { show: false },
             },
             // 起手是空的：这时候作品还没拿到（见 init），拿到后再 setOption 补一次
             data: seriesData(),
@@ -305,6 +365,17 @@ function renderMap(geo) {
             openDetail(p.name, list, null);
         }
     });
+
+    /* 光标：只有「有作品的省」是能点的，得让手型说出来。
+       ECharts 不给这个能力（画布就一个 cursor），所以按 mouseover 自己切类。
+       globalout 是兜底 —— 直接从省上滑出画布时不一定补一次 mouseout */
+    chart.on('mouseover', p => {
+        if (p.name && byProvince.has(p.name)) {
+            els.map.classList.add('is-hot');
+        }
+    });
+    chart.on('mouseout', () => els.map.classList.remove('is-hot'));
+    chart.on('globalout', () => els.map.classList.remove('is-hot'));
 
     // 容器尺寸变了要告诉 ECharts，否则画布还是旧的尺寸
     new ResizeObserver(() => chart.resize()).observe(els.map);
@@ -456,8 +527,12 @@ function ymd(ts) {
 }
 
 function photoHtml(w, i) {
+    /* --i 是入场错峰用的序号（map.css 里的 riseIn）。封顶在 12：
+       一面墙几十张的话，最后那张要等好几秒才浮上来，那不是入场是卡顿 */
+    const step = Math.min(i, 12);
     return `
-        <button class="dphoto ${WALL_SHAPE[i % WALL_SHAPE.length]}" type="button" data-i="${i}">
+        <button class="dphoto ${WALL_SHAPE[i % WALL_SHAPE.length]}" type="button" data-i="${i}"
+                style="--i:${step}">
             <img class="dphoto__img" src="${escapeHtml(w.url)}" alt="${escapeHtml(w.title)}"
                  loading="lazy" decoding="async">
         </button>`;
@@ -659,4 +734,6 @@ addEventListener('resize', () => {
 function fail(message) {
     els.map.innerHTML = `<p class="map-error">${escapeHtml(message)}</p>`;
     els.uncat.hidden = true;
+    // 地图没画出来，别让「载入中」一直转着骗人
+    els.boot.classList.add('is-gone');
 }
