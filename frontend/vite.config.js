@@ -16,12 +16,15 @@ export default defineConfig({
     },
     build: {
         outDir: 'dist',
-        // 三个页面都是入口；不写这里的话 build 只会打包 index.html
+        // 四个页面都是入口；不写这里的话 build 只会打包 index.html
+        // ⚠️ 这一条只在 build 时才咬人：漏了新页面，dev server 照常能开，
+        //    只有 dist 里少一页 —— 上线才发现。
         rollupOptions: {
             input: {
                 index: entry('./index.html'),
                 admin: entry('./admin.html'),
                 map: entry('./map.html'),
+                timeline: entry('./timeline.html'),
             },
         },
     },

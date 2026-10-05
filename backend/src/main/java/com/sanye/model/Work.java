@@ -21,6 +21,18 @@ public class Work {
     /** 修图后图片地址 */
     private String afterUrl;
     private long createTime;
+    /**
+     * 拍摄城市，可空（老作品都没有）。只用来数地图页「旅途印记」里的
+     * 「到访城市总数」，不参与地图本身 —— 地图是省级的，china.json 里没有市级边界。
+     */
+    private String city;
+    /**
+     * 拍摄日期，当地零点的时间戳（毫秒）。0 = 没填。
+     * <p>
+     * 用毫秒而不是 "2026-05-14" 这种字符串，是为了和 {@link #createTime} 一致：
+     * 前端的 ymd / dateSpan / formatTime 全都吃毫秒，混两种类型迟早要出事。
+     */
+    private long takenAt;
 
     public Long getId() {
         return id;
@@ -76,5 +88,21 @@ public class Work {
 
     public void setCreateTime(long createTime) {
         this.createTime = createTime;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public long getTakenAt() {
+        return takenAt;
+    }
+
+    public void setTakenAt(long takenAt) {
+        this.takenAt = takenAt;
     }
 }

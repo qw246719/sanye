@@ -39,6 +39,11 @@ const lbClose = document.getElementById('lbClose');
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/* 滚动进度线：宽度跟着「滚了多少」走，见 updateProgress() */
+const progress = document.getElementById('progress');
+/* 页脚：滚到眼前才浮现，见 init() 里那个观察器 */
+const footEl = document.querySelector('.foot');
+
 /* ---------------- 状态 ---------------- */
 
 const state = {
@@ -50,11 +55,15 @@ const state = {
 init();
 
 async function init() {
+    /* 给 CSS 一个「脚本在跑」的信号：像 .foot 那种默认要可见的兜底，
+       只在确认脚本活着时才交给动画去藏（见 gallery.css 的 .js .foot） */
+    document.body.classList.add('js');
     driveHero();
     // 不 await：封面要等一个网络往返，别让它挡住滚动驱动的初始化和下面那批请求
     applyCover();
     bindLightbox();
     showSkeletons();
+    revealFooter();
 
     let works = null;
     try {
@@ -132,6 +141,7 @@ function driveHero() {
     function onScroll() {
         const h = hero.offsetHeight || innerHeight;
         document.body.classList.toggle('is-past', window.scrollY > h * 0.55);
+        updateProgress();
         if (!raf) {
             raf = requestAnimationFrame(frame);
         }
@@ -142,13 +152,44 @@ function driveHero() {
     onScroll();
 }
 
+/* 顶上的进度线：读到哪儿，线就铺到哪儿。scrollHeight 随时会变
+   （图 decode 完把卡片撑高），所以每次现算，不缓存 */
+function updateProgress() {
+    if (!progress) {
+        return;
+    }
+    const max = document.documentElement.scrollHeight - innerHeight;
+    progress.style.width = (max > 0 ? (scrollY / max) * 100 : 0) + '%';
+}
+
+/* 页脚滚到眼前才浮现。和作品卡那套错峰同构，但页脚只有一个 */
+function revealFooter() {
+    if (!footEl) {
+        return;
+    }
+    const ioFoot = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+            if (e.isIntersecting) {
+                footEl.classList.add('is-in');
+                ioFoot.disconnect();
+            }
+        });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: .1 });
+    ioFoot.observe(footEl);
+}
+
 /* ---------------- 首屏封面 ---------------- */
 
 /*
- * 首屏那张图默认是内置的 /cover.jpg（直接写在 HTML 里，所以首屏不会先黑一下，
- * 后端没起来或 JS 出问题时也还有封面）。后端配过自定义封面才换掉。
+ * 首屏那张图默认是内置的 /cover.jpg（直接写在 HTML 里，后端没起来或
+ * JS 出问题时也还有这张兜底）。但 CSS 里它默认是 opacity: 0 藏着的 ——
+ * 直接藏，不靠 JS 去藏，否则模块脚本（延迟执行）跑起来之前那一小段
+ * 解析期 /cover.jpg 已经画出来闪一下了。applyCover() 拿到真正的封面、
+ * 解码好、换好 src，才给 hero 加 .is-in 淡进来。
  */
 function applyCover() {
+    const settle = () => revealHero();
+
     fetchSiteConfig()
         .then((cfg) => {
             // assetUrl 只套在后端返回的 coverUrl 上：它在 /uploads/ 下，属于后端域名，
@@ -157,12 +198,24 @@ function applyCover() {
             const url = assetUrl(cfg && cfg.coverUrl);
             if (url) {
                 swapHero(url);
+            } else {
+                // 没配自定义封面：内置那张就是封面，把它淡进来即可
+                settle();
             }
         })
         .catch(() => {
             // 连不上后端就什么都不做，内置封面照旧 ——
             // 和「后端没作品就退回演示图」是同一套兜底
+            settle();
         });
+}
+
+/* 封面最终确定后把图淡进来（撤掉默认的 opacity: 0）。
+   必须先在下一帧让浏览器认下这次 src 赋值再加 .is-in —— 不然淡入和换图
+   挤在同一帧，opacity 从 0 到 1 没有可比的起点，整段过渡会丢掉 */
+function revealHero() {
+    void hero.offsetWidth;
+    hero.classList.add('is-in');
 }
 
 /*
@@ -197,11 +250,15 @@ function swapHero(url) {
             heroSoft.src = '/cover.jpg';
             heroImg.alt = '仰拍的三叶草丛和蓝天';
             heroImg.removeAttribute('aria-hidden');
+            revealHero();
         };
         heroImg.addEventListener('error', back);
         heroSoft.addEventListener('error', back);
+
+        revealHero();
     }, () => {
         // decode 失败说明这张图压根取不到，那就别换，内置那张照旧
+        revealHero();
     });
 }
 

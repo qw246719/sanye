@@ -29,11 +29,80 @@
 
 <header class="map-bar">
     <p class="map-bar__title">作品地图</p>
-    <a class="map-bar__back" href="index.html">← 作品列表</a>
+    <!-- 右侧收进一个 wrapper：.map-bar 是 space-between，直接往里塞第二个
+         链接会被摆到正中间去（首页 .bar__links 是同样的做法） -->
+    <nav class="map-bar__links">
+        <a class="map-bar__back" href="timeline.html">人生足迹时间轴</a>
+        <a class="map-bar__back" href="index.html">← 作品列表</a>
+    </nav>
 </header>
+
+<!-- 城市搜索条：浮在顶栏下方右上角。输入城市（或省份），回车 / 点按钮
+     就放大定位到它所在的省（见 js/map.js 的 searchProvince / locateToProvince）。
+     整块是 body 的直接子节点，靠 fixed 定位，不参与顶栏的 space-between -->
+<form class="map-search" id="mapSearch" role="search">
+    <input class="map-search__input" id="mapSearchInput" type="search"
+           placeholder="搜城市 / 省份" autocomplete="off"
+           spellcheck="false" aria-label="搜索城市，定位到所在省份">
+    <button class="map-search__btn" id="mapSearchBtn" type="submit" aria-label="搜索">搜</button>
+</form>
 
 <!-- 一个省都没选的作品全在这儿。数字由 map.js 填 -->
 <button class="uncat" id="uncatEntry" type="button">未归类作品 (0)</button>
+
+<!-- ============================================================
+     右侧浮着的统计面板「旅途印记」。
+
+     没点省份时它在，点开省份就被详情整个盖住（层级 120 < 详情 160），
+     按返回再露出来。数字全部来自 js/map.js 里已有的 byProvince /
+     uncategorized，不额外请求接口。
+
+     桌面端是右上角一张浮起来的小卡片（让开顶栏、不拉满整屏），
+     窄屏不收成常驻 —— 一块 60vh 一直压在手机上就没法看地图了。
+     那里收成右下角一个按钮，点开才从底部滑上来（见 map.css 的媒体查询）。
+     ============================================================ -->
+<aside class="journey" id="journey" aria-labelledby="journeyTitle">
+    <p class="journey__eyebrow">JOURNEY OVERVIEW</p>
+    <h2 class="journey__title" id="journeyTitle">旅途印记</h2>
+
+    <!-- 到访城市总数。城市是作品的选填字段，没填的不算 -->
+    <p class="journey__big">
+        <span class="journey__num" id="journeyCities">0</span>
+        <span class="journey__unit">座城市</span>
+    </p>
+    <p class="journey__note" id="journeyProvinces"></p>
+
+    <div class="journey__meter">
+        <div class="journey__meter-head">
+            <span>中国省份覆盖率</span>
+            <span class="journey__meter-n" id="journeyCoverage">—</span>
+        </div>
+        <!-- role/aria-valuenow 由 map.js 跟着宽度一起更新 -->
+        <div class="journey__bar" id="journeyBar" role="progressbar"
+             aria-label="中国省份覆盖率" aria-valuemin="0" aria-valuemax="34" aria-valuenow="0">
+            <div class="journey__bar-fill" id="journeyBarFill"></div>
+        </div>
+    </div>
+
+    <!-- 两张小卡。旅途天数要作品填了拍摄日期才算得出，一条都没有时是「—」 -->
+    <div class="journey__cards">
+        <div class="journey__card">
+            <span class="journey__card-n" id="journeyDays">—</span>
+            <span class="journey__card-l">旅途天数</span>
+        </div>
+        <div class="journey__card">
+            <span class="journey__card-n" id="journeyPhotos">0</span>
+            <span class="journey__card-l">珍藏照片</span>
+        </div>
+    </div>
+
+    <h3 class="journey__sec">最近的回忆</h3>
+    <div class="journey__list" id="journeyList"></div>
+</aside>
+
+<!-- 窄屏才出现：那块面板的开合按钮。桌面上是 display: none -->
+<button class="journey-toggle" id="journeyToggle" type="button"
+        aria-expanded="false" aria-controls="journey">旅途印记</button>
 
 <!-- ============================================================
      省份详情。点地图上点亮的省就从右侧拉出半屏面板，点「未归类」也走这里

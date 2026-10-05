@@ -13,6 +13,9 @@
 <!-- 页面上不出现站名，但文档需要一个 h1 撑住大纲，只给读屏用 -->
 <h1 class="sr-only">作品辑</h1>
 
+<!-- 滚到哪读到哪的进度线：钉在视口最顶上，宽度跟着滚动走（gallery.js 更新） -->
+<div class="progress" id="progress" aria-hidden="true"></div>
+
 <!-- ============================================================
      首屏：一整屏封面照，钉在顶部不动。
      往下滚时照片逐渐化开、变暗、往下沉，下面的内容像一张纸
@@ -31,6 +34,10 @@
         <p class="hero__kicker">SELECTED WORKS</p>
         <p class="hero__sub">每一张，都从「差一点」开始。</p>
     </div>
+
+    <p class="hero__quote">命运这种东西，生来就是要被踏于足下的，<br>
+        如果你还未有力量反抗它，只需怀着勇气等待。<br>
+        《龙族Ⅲ》讲的其实就是这样一个故事。</p>
 
     <div class="hero__cue" aria-hidden="true">
         <span class="hero__cue-line"></span>

@@ -21,7 +21,8 @@ public class RootController {
         info.put("note", "这里只是接口服务，页面在前端工程里");
         info.put("frontend", "http://localhost:5173（在 frontend/ 下执行 npm run dev）");
         info.put("works", "GET  /api/works");
-        info.put("upload", "POST /api/work  (multipart: title, provinces(可重复/可空), before, after)");
+        info.put("upload", "POST /api/work  (multipart: title, provinces(可重复/可空), city, takenAt, before, after)");
+        info.put("updateMeta", "PUT  /api/work/{id}  (json: city, takenAt)  只改这两个字段");
         info.put("delete", "DELETE /api/work/{id}");
         info.put("images", "GET  /uploads/{filename}");
         info.put("siteConfig", "GET  /api/site-config  /  PUT /api/site-config  (json: introText, fontId)");

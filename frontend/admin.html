@@ -56,7 +56,8 @@
                     <h3 class="panel__title">上传新作品</h3>
                     <p class="panel__desc">
                         同一张图的前后两个版本，勾上拍摄地所在的省份。标题和描述会跟着照片出现在首页，
-                        省份决定它在地图上点亮哪儿。
+                        省份决定它在地图上点亮哪儿。拍摄城市和日期都不必填 ——
+                        填了会进地图页右侧那块「旅途印记」的统计。
                     </p>
 
                     <form id="uploadForm" novalidate>
@@ -88,6 +89,23 @@
                                 可多选 —— 一张照片横跨两个省（比如川藏线）就都勾上。一个都不勾就归入「未归类」，
                                 只会出现在地图左下角那个入口里。
                             </p>
+                        </div>
+
+                        <!-- 拍摄信息。两个都不必填 —— 老作品一件都没有，逼着填反而
+                             会把「不知道拍哪儿」的人挡在门外。地图页那块统计面板
+                             （「旅途印记」）数城市、数旅途天数，用的就是这两个 -->
+                        <div class="upload-row">
+                            <div class="field">
+                                <label for="city">拍摄城市（选填）</label>
+                                <input class="input" type="text" id="city" name="city"
+                                       placeholder="例如：杭州" maxlength="20">
+                            </div>
+                            <div class="field">
+                                <label for="takenAt">拍摄日期（选填）</label>
+                                <!-- max 由 admin.js 填成今天（写死日期的话过一天就过期了）：
+                                     往后填的话后端会当没填处理，不如在浏览器这一层就选不出来 -->
+                                <input class="input" type="date" id="takenAt" name="takenAt">
+                            </div>
                         </div>
 
                         <div class="field">

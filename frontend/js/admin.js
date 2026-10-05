@@ -2,6 +2,7 @@
    后台管理页
    - 表单提交：FormData 上传两张图 -> POST /api/work
    - 列表渲染：GET /api/works
+   - 改作品的拍摄城市 / 日期：PUT /api/work/{id}（列表里每行那个「编辑」）
    - 删除：DELETE /api/work/{id}
    - 首页封面：GET /api/site-config、POST/DELETE /api/site-config/cover
    - 省份设置：GET /api/province-profiles、PUT /api/province-profile、
@@ -9,10 +10,11 @@
    ============================================================ */
 
 import {
-    fetchSiteConfig, fetchWorks, uploadWork, removeWork,
+    fetchSiteConfig, fetchWorks, uploadWork, updateWork, removeWork,
     uploadCover, clearCover,
     fetchProvinceProfiles, saveProvinceNote, uploadProvinceCover, clearProvinceCover,
-    toast, escapeHtml, formatTime, assetUrl, DESC_MAX, NOTE_MAX
+    toast, escapeHtml, formatTime, assetUrl,
+    dateToEpoch, epochToDate, DESC_MAX, CITY_MAX, NOTE_MAX
 } from './api.js';
 import { PROVINCES } from './provinces.js';
 
@@ -20,6 +22,8 @@ const formEl = document.getElementById('uploadForm');
 const titleEl = document.getElementById('title');
 const descEl = document.getElementById('desc');
 const descCountEl = document.getElementById('descCount');
+const cityEl = document.getElementById('city');
+const takenAtEl = document.getElementById('takenAt');
 const chipsEl = document.getElementById('provinceChips');
 const provCountEl = document.getElementById('provCount');
 const beforeEl = document.getElementById('beforeFile');
@@ -125,6 +129,11 @@ function bindEvents() {
     coverSubmitBtn.addEventListener('click', onCoverSubmit);
     coverResetBtn.addEventListener('click', onCoverReset);
 
+    /* 日期框的上限是「今天」。写死在 HTML 里的话过一天就过期，
+       所以起手时按当前时间算一次 —— 后端对未来的日期是当没填处理的，
+       不如在浏览器这一层就让人选不出来 */
+    takenAtEl.max = epochToDate(Date.now());
+
     // 省份设置同理：下拉的选项是本地常量，绑一次就够
     profileProvinceEl.addEventListener('change', onProfileProvinceChange);
     noteTextEl.addEventListener('input', updateNoteCount);
@@ -171,6 +180,8 @@ async function onSubmit(e) {
     const title = titleEl.value.trim();
     const desc = descEl.value.trim();
     const provinces = selectedProvinces();
+    const city = cityEl.value.trim();
+    const takenAt = dateToEpoch(takenAtEl.value);
     const beforeFile = beforeEl.files[0];
     const afterFile = afterEl.files[0];
 
@@ -190,10 +201,17 @@ async function onSubmit(e) {
         return;
     }
 
+    // 城市名超长交给后端报错也行，但那要等两张图都传完才知道，白等一趟
+    if (city.length > CITY_MAX) {
+        toast(`城市名最多 ${CITY_MAX} 个字`, 'err');
+        cityEl.focus();
+        return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = '上传中…';
     try {
-        const work = await uploadWork({ title, desc, provinces, beforeFile, afterFile });
+        const work = await uploadWork({ title, desc, provinces, city, takenAt, beforeFile, afterFile });
         toast('上传成功', 'ok');
         resetForm();
         works.unshift(work);
@@ -520,19 +538,129 @@ function renderList() {
                 ${w.desc ? `<p class="admin-item__desc">${escapeHtml(w.desc)}</p>` : ''}
                 <div class="admin-item__sub">
                     <span>${escapeHtml(provinceLabel(w))}</span>
+                    ${metaLabel(w)}
                     <span>${formatTime(w.createTime)}</span>
                     <span>#${w.id}</span>
                 </div>
             </div>
             <div class="admin-item__actions">
-                <button class="btn btn--sm btn--danger" data-delete="${w.id}">删除</button>
+                <button class="btn btn--sm" type="button" data-edit="${w.id}"
+                        aria-expanded="false" aria-controls="edit-${w.id}">编辑</button>
+                <button class="btn btn--sm btn--danger" type="button" data-delete="${w.id}">删除</button>
             </div>
+            <!-- 展开的补填块。占满整行（见 admin.css 里 .admin-item__edit 那段），
+                 自带 display 所以 [hidden] 属性压不过它，那边补了一条 [hidden] 规则 -->
+            <form class="admin-item__edit" id="edit-${w.id}" data-edit-form hidden>
+                <div class="field">
+                    <label for="city-${w.id}">拍摄城市</label>
+                    <input class="input" type="text" id="city-${w.id}" name="city"
+                           maxlength="${CITY_MAX}" placeholder="例如：杭州"
+                           value="${escapeHtml(w.city || '')}">
+                </div>
+                <div class="field">
+                    <label for="taken-${w.id}">拍摄日期</label>
+                    <input class="input" type="date" id="taken-${w.id}" name="takenAt"
+                           max="${todayStr()}" value="${epochToDate(w.takenAt)}">
+                </div>
+                <div class="admin-item__edit-actions">
+                    <button class="btn btn--sm btn--primary" type="submit">保存</button>
+                    <button class="btn btn--sm" type="button" data-cancel>取消</button>
+                </div>
+            </form>
         </div>
     `).join('');
 
     listEl.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => onDelete(Number(btn.dataset.delete), btn));
     });
+    listEl.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => toggleEdit(Number(btn.dataset.edit)));
+    });
+    listEl.querySelectorAll('.admin-item__edit').forEach(editForm => {
+        editForm.addEventListener('submit', e => {
+            e.preventDefault();
+            onMetaSubmit(Number(editForm.closest('.admin-item').dataset.id), editForm);
+        });
+        editForm.querySelector('[data-cancel]').addEventListener('click', () => closeEdit(editForm));
+    });
+}
+
+/**
+ * 列表里那行「城市 · 2026.05.14」。两个都没填就一个字都不出现 ——
+ * 老作品全都没有，每行都挂一句「未填写」只会把这一行挤满。
+ */
+function metaLabel(w) {
+    const parts = [];
+    if (w.city) {
+        parts.push(escapeHtml(w.city));
+    }
+    if (w.takenAt) {
+        parts.push(escapeHtml(epochToDate(w.takenAt).replace(/-/g, '.')));
+    }
+    return parts.length ? `<span>${parts.join(' · ')}</span>` : '';
+}
+
+function todayStr() {
+    return epochToDate(Date.now());
+}
+
+/* ---------------- 编辑（补填城市 / 拍摄日期） ---------------- */
+
+/* 同一时刻只开一行：两行都摊着的时候，列表一眼看不出在改哪件。
+   打开前先把已经开着的那行收掉，那行里没保存的输入跟着丢 —— 和省份设置
+   切省时的处理一致，那边也是直接丢，不问 */
+function toggleEdit(id) {
+    const item = listEl.querySelector(`.admin-item[data-id="${id}"]`);
+    const form = item && item.querySelector('.admin-item__edit');
+    if (!form) {
+        return;
+    }
+    const willOpen = form.hidden;
+    closeEdit();
+    if (!willOpen) {
+        return;
+    }
+    form.hidden = false;
+    item.querySelector('[data-edit]').setAttribute('aria-expanded', 'true');
+    // 打开就把光标放进第一个框：这一行的用途就是补填，进来就要打字
+    form.querySelector('input[name="city"]').focus();
+}
+
+/** 收起某一行。不传就把所有开着的都收掉 */
+function closeEdit(form) {
+    const forms = form ? [form] : Array.from(listEl.querySelectorAll('.admin-item__edit'));
+    forms.forEach(el => {
+        if (el.hidden) {
+            return;
+        }
+        el.hidden = true;
+        el.closest('.admin-item').querySelector('[data-edit]').setAttribute('aria-expanded', 'false');
+    });
+}
+
+async function onMetaSubmit(id, form) {
+    const city = form.querySelector('input[name="city"]').value.trim();
+    const takenAt = dateToEpoch(form.querySelector('input[name="takenAt"]').value);
+    if (city.length > CITY_MAX) {
+        toast(`城市名最多 ${CITY_MAX} 个字`, 'err');
+        return;
+    }
+
+    const saveBtn = form.querySelector('button[type="submit"]');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中…';
+    try {
+        /* 用返回值就地更新那条。后端只动这两个字段，回来的是整件作品，
+           所以别的字段照抄服务器那份，本地不用自己拼 */
+        const saved = await updateWork(id, { city, takenAt });
+        works = works.map(w => (w.id === id ? saved : w));
+        renderList();
+        toast('已保存', 'ok');
+    } catch (err) {
+        toast(err.message, 'err');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '保存';
+    }
 }
 
 /** 列表里那行省份。没勾的写「未归类」，和地图左下角那个入口一个叫法 */

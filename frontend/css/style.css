@@ -29,6 +29,13 @@
 
     --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --header-h: 58px;
+
+    /* 深色主题。浏览器据此按深色画**原生**控件：滚动条、日期框那个小日历
+       图标、自动填充、选中高亮 —— 拿到的仍是原生那一条（有悬停态、有按下态、
+       能拖轨道），不用再手写 ::-webkit-scrollbar 去凑。
+       ⚠️ gallery.css 的 :root 里也有一份一样的，两份是对称的（admin 用这份、
+       首页和地图页用那份），改一处要一起改。 */
+    color-scheme: dark;
 }
 
 * {

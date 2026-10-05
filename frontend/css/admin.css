@@ -189,7 +189,8 @@
     border-color: var(--accent);
 }
 
-/* 两个上传框并排 */
+/* 两个并排的框：上传那两张图，以及「拍摄城市 + 拍摄日期」那行都用它。
+   并排而不是上下摞，是为了别把左边这张表单撑得比右边那个列表框高太多 */
 .upload-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -342,20 +343,13 @@
     overscroll-behavior: contain;
 }
 
-/* 页面没写 color-scheme，深色底上浏览器给的是浅色滚动条，很扎眼。
-   只给这个框单独调，不动整页的 */
-.admin-list::-webkit-scrollbar {
-    width: 6px;
-}
+/* 这里原来有一份 ::-webkit-scrollbar 的自定义滚动条（6px 细条、绿灰色）。
+   删了 —— 站上的滚动条一律用浏览器原生那条。深色底配浅色条的毛病由
+   gallery.css :root 里的 color-scheme: dark 从根上解决，不用手画。
 
-.admin-list::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
-    border-radius: 999px;
-}
-
-.admin-list::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
-}
+   ⚠️ 别再把这几条加回来：原生滚动条在 Windows 上是有悬停态、有按下态、
+   能拖拽中间那条轨道的完整控件，画出来的那份只有「宽」和「thumb 颜色」
+   两件事，滚起来手感是另一种。 */
 
 .admin-item {
     display: grid;
@@ -423,6 +417,67 @@
     flex-wrap: wrap;
 }
 
+/* 两个按钮并排。不加这条的话它们会贴着，中间只隔一个空格 */
+.admin-item__actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ---------------- 列表里展开的「编辑」块 ----------------
+   补填拍摄城市 / 日期用。这两个字段是后加的，之前传的作品都没有 ——
+   只能上传时填的话，唯一的办法就是把老作品删掉重传。
+
+   整块占满这一行的三列（缩略图 / 正文 / 按钮都归它上面那行管），
+   看上去像这件作品在自己的框里摊开了一层 */
+.admin-item__edit {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin-top: 2px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+/* 两个输入框平分，窄了（列表栏在 960px 屏上只剩 400 出头）自己折行 */
+.admin-item__edit .field {
+    flex: 1 1 160px;
+    /* 这一行的高度由 align-items: flex-end 对齐，不留 .field 那个下边距，
+       否则两个框会和右边的按钮错开一截 */
+    margin-bottom: 0;
+}
+
+.admin-item__edit-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ⚠️ 这条不能省：上面给 .admin-item__edit 写了 display: flex，
+   作者样式压得过浏览器默认的 [hidden]{display:none}，光加 hidden 属性
+   是藏不住的（和 .cover-actions .btn[hidden] 是同一个坑） */
+.admin-item__edit[hidden] {
+    display: none;
+}
+
+/* 日期框里那个小日历图标是系统画的。原来它在深色底上是黑的、看不见，
+   所以这儿挂了一条 filter: invert(1) 把它反过来 —— 现在不用了：
+   gallery.css 的 :root 写了 color-scheme: dark，浏览器自己就按深色主题
+   画一个浅色的图标。⚠️ invert 那条别加回来，在深色主题下它会把浅色图标
+   又反过来变成黑的，正好反过来。
+
+   只剩「指针变手型」和一点透明度 —— 纯外观，不是可可访问性必需的。 */
+.admin-item__edit input[type="date"]::-webkit-calendar-picker-indicator,
+#uploadForm input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: .6;
+    cursor: pointer;
+}
+
+.admin-item__edit input[type="date"]::-webkit-calendar-picker-indicator:hover,
+#uploadForm input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
 
 @media (max-width: 960px) {
     .admin-grid--main {
@@ -460,6 +515,15 @@
 @media (max-width: 480px) {
     .upload-row {
         grid-template-columns: 1fr;
+    }
+
+    /* 这一行已经窄到放不下两个框 + 两个按钮了，各占一行 */
+    .admin-item__edit {
+        display: block;
+    }
+
+    .admin-item__edit .field {
+        margin-bottom: 14px;
     }
 
     .admin-item {

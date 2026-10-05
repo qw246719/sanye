@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>人生足迹时间轴</title>
+    <meta name="theme-color" content="#08080A">
+    <meta name="description" content="按年份把去过的城市串成一条线。">
+    <!-- 配色变量、字体、缓动都在 gallery.css 里。跟地图页同一条纪律：
+         在这儿再抄一份 :root 一定会漂，直接引它。
+         timeline.css 只写这一页自己的东西。 -->
+    <link rel="stylesheet" href="css/gallery.css">
+    <link rel="stylesheet" href="css/timeline.css">
+</head>
+<body>
+
+<!-- ============================================================
+     页头。小标和主副标题都是写死的文案，不来自后台。
+     ============================================================ -->
+<header class="tl-head">
+    <div class="tl-head__top">
+        <p class="tl-head__kicker">MY PRIVATE ATLAS / 时间轴</p>
+        <a class="tl-head__back" href="map.html">← 作品地图</a>
+    </div>
+    <h1 class="tl-head__title">人生足迹时间轴</h1>
+    <p class="tl-head__sub">沿着年份，重新走一遍走过的路。</p>
+</header>
+
+<main class="tl-main">
+
+    <!-- 时间轴本体。整条由 js/timeline.js 渲染 ——
+         内容是作品数据算出来的，写死在 HTML 里没有意义。
+         空态和报错也由它写进下面的 .tl-state -->
+    <ol class="tl" id="tlList"></ol>
+
+    <!-- 「另有 N 件作品没填拍摄日期」。没有就不出现 -->
+    <p class="tl-hint" id="tlHint" hidden></p>
+
+    <!-- 一条都排不出来时（后端没起来、或者还没补城市和日期）这儿出一句话。
+         刻意**不**退成内置演示图：演示图既没城市也没日期，排出来还是空的，
+         只会让人以为页面坏了 -->
+    <p class="tl-state" id="tlState" hidden></p>
+
+</main>
+
+<footer class="tl-foot">
+    <a href="map.html">作品地图</a>
+    <a href="index.html">作品列表</a>
+</footer>
+
+<script type="module" src="/js/timeline.js"></script>
+</body>
+</html>

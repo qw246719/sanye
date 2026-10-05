@@ -34,6 +34,15 @@
     --ease: cubic-bezier(.22, .72, .24, 1);
     --ease-in: cubic-bezier(.55, .06, .8, .3);
     --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+    /* 整站是深色的，这条得写 —— 不写的话浏览器按浅色渲染原生控件：
+       滚动条是浅色的一条压在黑底上很扎眼，日期框里那个小日历图标是黑的、
+       看不见，输入框的自动填充、选中高亮也都会是浅色那套。
+       写了之后拿到的仍是**原生**滚动条，只是按深色主题画（有悬停态、
+       有按下态、能拖轨道），不用再手写一份 ::-webkit-scrollbar 去凑。
+       ⚠️ 这也意味着 admin.css 里日期框那个 filter: invert(1) 是多余的，
+       留着反而会把图标反过来、在深底上看不见 —— 那边一起删了。 */
+    color-scheme: dark;
 }
 
 * {
@@ -209,6 +218,98 @@ a {
     0%   { transform: translateX(-100%); }
     60%  { transform: translateX(250%); }
     100% { transform: translateX(250%); }
+}
+
+/* ============================================================
+   首屏入场：别一进来就是一张钉死的照片。
+
+   - 那张锐利层进场先放大再收平（Ken Burns 的一次性版本），
+     照片从一开始就「活着」而不是贴着；
+   - kicker / sub 两行文字错开上浮，比照片慢半拍接上。
+   只动 .hero__img 里**锐利**那一层 —— 模糊层自己带着
+   scale(1.14) 补边缘，不能给它再套一个 transform。
+   ============================================================ */
+
+.hero__img:not(.hero__img--soft) {
+    animation: heroIn 3s var(--ease) both;
+}
+
+@keyframes heroIn {
+    from { transform: scale(1.08); }
+    to   { transform: scale(1); }
+}
+
+.hero__kicker {
+    animation: riseFade .9s var(--ease) .18s both;
+}
+
+.hero__sub {
+    animation: riseFade 1.05s var(--ease) .34s both;
+}
+
+@keyframes riseFade {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* 右上角那段引文（《龙族Ⅲ》）。
+   排在地图入口那个小胶囊的下方：右上角那是 fixed 的「作品地图」按钮，
+   顶 ~14px、高 ~32px，这边从 ~100px 起头就不会跟它撞。
+   右对齐、压在偏暖的白上，和左下角那行副标题同一种口吻。 */
+.hero__quote {
+    position: absolute;
+    top: clamp(104px, 14vh, 164px);
+    right: var(--pad);
+    max-width: clamp(280px, 36vw, 480px);
+    margin: 0;
+    text-align: right;
+    font-size: 13px;
+    line-height: 1.9;
+    letter-spacing: .05em;
+    color: rgba(255, 255, 255, .66);
+    text-shadow: 0 4px 30px rgba(0, 0, 0, .5);
+    animation: quoteIn 1.2s var(--ease) .5s both;
+}
+
+@keyframes quoteIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------------------
+   封面就绪前藏掉图片：默认 opacity: 0（直接写死在 CSS 里，不是靠 JS
+   去加类 —— 模块脚本是延迟执行的，等它跑起来 /cover.jpg 早就画出来了）。
+   只有 applyCover() 把真正的封面解码好、换成 src 之后，给 hero 加
+   .is-in 才淡进来。代价是脚本挂了首屏没有封面（只剩暗底），但脚本本来就
+   负责渲染作品列表，没有它整页也起不来。
+   ------------------------------------------------------------ */
+
+.hero__img:not(.hero__img--soft) {
+    opacity: 0;
+    /* 从 .is-in 加上那一下，图从透明淡到可见（Ken Burns 走的是
+       transform，跟 opacity 各管各的，互不抢） */
+    transition: opacity .55s var(--ease);
+}
+
+.hero.is-in .hero__img:not(.hero__img--soft) {
+    opacity: 1;
+}
+
+/* ============================================================
+   滚动进度线：钉在视口最顶上的一条绿线，宽度跟滚动走。
+   层级 40 —— 压在正文(10)和顶栏(30)之上，页面上最细最亮的一笔。
+   ============================================================ */
+
+.progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px rgba(155, 196, 111, .55);
+    pointer-events: none;
 }
 
 /* ============================================================
@@ -411,6 +512,15 @@ body.is-past .map-fab {
     background: var(--ph);
     /* 先按 4:3 撑开，图解码完 JS 会按真实比例改掉，避免整页跳一下 */
     aspect-ratio: 4 / 3;
+    /* 悬停时起一圈绿边 + 提起来的影子，跟图片自己推近是同一层回执 */
+    transition: box-shadow .5s var(--ease);
+}
+
+/* 鼠标停在照片上：图推近（见 .work__img 的 scale），外圈再起一层绿边和
+   一道往下压的投影，把「这张能点开」从图里带到整张卡片上 */
+.work__hit:hover .work__frame,
+.work__hit:focus-visible .work__frame {
+    box-shadow: 0 0 0 1px rgba(155, 196, 111, .32), 0 34px 70px rgba(0, 0, 0, .5);
 }
 
 /* 每张图的等待色由标题哈希而来：都是很暗的一档，只分得出彼此，不抢眼 */
@@ -514,7 +624,8 @@ body.is-past .map-fab {
     letter-spacing: .02em;
 }
 
-/* 标题和描述之间那根短横线，长度跟着文字内容而不是容器走 */
+/* 标题和描述之间那根短横线，长度跟着文字内容而不是容器走。
+   悬停时这根线伸长、点成绿色 —— 卡片里唯一一处悬停动画 */
 .work__title::after {
     content: "";
     display: block;
@@ -522,6 +633,13 @@ body.is-past .map-fab {
     height: 1px;
     margin-top: clamp(12px, 2vh, 20px);
     background: var(--line);
+    transition: width .55s var(--ease), background .55s var(--ease);
+}
+
+.work:hover .work__title::after,
+.work__hit:focus-visible ~ .work__body .work__title::after {
+    width: 66px;
+    background: var(--accent);
 }
 
 .work__desc {
@@ -553,6 +671,19 @@ body.is-past .map-fab {
     margin: clamp(88px, 15vh, 200px) auto 0;
     padding: clamp(34px, 5vh, 56px) var(--pad) clamp(36px, 6vh, 64px);
     border-top: 1px solid var(--line-soft);
+}
+
+/* 页脚滚到眼前才从底下浮上来。用 .js 守卫：脚本没跑（或报错）时
+   它是默认可见的，绝不因为一条动画把整页最后的信息藏掉 */
+.js .foot {
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity .85s var(--ease), transform .85s var(--ease);
+}
+
+.js .foot.is-in {
+    opacity: 1;
+    transform: none;
 }
 
 .foot__meta {
@@ -849,10 +980,28 @@ body.is-past .map-fab {
 
 @media (prefers-reduced-motion: reduce) {
     .hero__cue-line::after,
+    .hero__img:not(.hero__img--soft),
+    .hero__kicker,
+    .hero__sub,
+    .hero__quote,
     .work__ph::after,
     .sk__box,
     .sk__bar {
         animation: none;
+    }
+
+    /* 入场那两行文字回到静止可见（keyframes 的 fill: both 被撤掉后
+       就是这个默认态），不靠动画撑着 */
+    .hero__kicker,
+    .hero__sub {
+        opacity: 1;
+        transform: none;
+    }
+
+    /* 页脚只留淡入，上浮不要 */
+    .js .foot {
+        transform: none;
+        transition: opacity .5s ease;
     }
 
     .work {

@@ -51,25 +51,71 @@ export function fetchWorks() {
 /** 描述字数上限，和后端 WorkService.DESC_MAX 保持一致 */
 export const DESC_MAX = 50;
 
+/** 城市名长度上限，和后端 WorkService.CITY_MAX 保持一致 */
+export const CITY_MAX = 20;
+
 /**
- * POST /api/work —— 两张图 + 标题 + 一句话描述 + 省份（可多选、可为空）
+ * POST /api/work —— 两张图 + 标题 + 一句话描述 + 省份（可多选、可为空）+ 拍摄信息
  *
  * provinces 用重复字段传，Spring 那边收成 List<String>；一个省都不选时
  * 就一个都不 append，后端那个参数是 required = false，会当空表处理。
+ *
+ * city / takenAt 都可选：takenAt 是 dateToEpoch 算出来的毫秒数，没填传 0。
  */
-export function uploadWork({ title, desc, provinces, beforeFile, afterFile }) {
+export function uploadWork({ title, desc, provinces, city, takenAt, beforeFile, afterFile }) {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('desc', desc || '');
     (provinces || []).forEach(name => fd.append('provinces', name));
+    fd.append('city', city || '');
+    fd.append('takenAt', String(takenAt || 0));
     fd.append('before', beforeFile);
     fd.append('after', afterFile);
     return request('/api/work', { method: 'POST', body: fd });
 }
 
+/**
+ * PUT /api/work/{id} —— 改一件作品的拍摄城市和拍摄日期，别的字段不动。
+ * 给老作品补填用：这两个字段是后加的，之前传的作品都没有。
+ * 两个字段都是全量的，传空串 / 0 就是清掉。
+ */
+export function updateWork(id, { city, takenAt }) {
+    return request(`/api/work/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city: city || '', takenAt: takenAt || 0 }),
+    });
+}
+
 /** DELETE /api/work/{id} */
 export function removeWork(id) {
     return request(`/api/work/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/**
+ * '2026-05-14'（<input type="date"> 的值）-> 当地零点的时间戳。空串 -> 0。
+ *
+ * ⚠️ 不能用 new Date('2026-05-14')：那种「只有日期」的字符串按 ISO 当 UTC 解析，
+ * 东八区算出来是当天早上 8 点，不是零点。后端存的必须是当地零点，
+ * 否则地图页那个「旅途天数」（max - min 除以一天的毫秒）会无缘无故多出一天。
+ * 拆成数字再 new Date(y, m-1, d) 才是当地时间的零点。
+ */
+export function dateToEpoch(str) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str || '').trim());
+    if (!m) {
+        return 0;
+    }
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+}
+
+/** dateToEpoch 的反向：毫秒 -> '2026-05-14'，给 <input type="date"> 当 value 用。0 -> 空串 */
+export function epochToDate(ts) {
+    if (!ts) {
+        return '';
+    }
+    const d = new Date(ts);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 /** GET /api/site-config —— 首屏封面、文字、字体 */

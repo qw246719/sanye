@@ -1,0 +1,398 @@
+/* ============================================================
+   人生足迹时间轴
+
+   配色/字体/缓动一律走 gallery.css 里已有的变量（这一页引了那份），
+   不在这儿重定义 token —— 跟 map.css 开头那条纪律是同一条。
+   用到的 --accent / --accent-soft / --line-soft / --ink-2 / --muted
+   都在那边。
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   页面底色
+
+   从下往上是：背景照片 → 压暗 → 三团很淡的光 → 暗角。
+   这四条和 css/map.css 里 body::before 是**同一份**（两页是连着走的，
+   底色一致才不像换了个站）—— ⚠️ 改一处要一起改。
+
+   ⚠️ 照片和压暗必须**写在同一元素、同一条 background 里**。这层带着
+   1.6s 的 ambientIn 淡入（从 opacity: 0 起步），分开写（照片挂 body、
+   压暗挂 ::before）的话加载瞬间会先闪一整张没压暗的亮照片，再慢慢暗下去。
+   地图页那边踩过这个坑，见 css/map.css 里同一段的长注释。
+
+   这一页是会滚动的，position: fixed 让照片跟着视口不动 —— 正是要的效果。
+   路径写裸的 /map-bg.jpg（在 public/ 里，跟 /china.json 同理），
+   **别套 assetUrl()**，那个只给后端的 /uploads/ 补前缀。
+   ------------------------------------------------------------ */
+body::before {
+    content: '';
+    position: fixed;
+    /* 四下多铺 10%：光晕是椭圆，铺满容器边角才不会有硬边 */
+    inset: -10%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(56% 50% at 46% 40%, rgba(155, 196, 111, .1), transparent 70%),
+        radial-gradient(46% 44% at 84% 12%, rgba(96, 132, 178, .08), transparent 72%),
+        radial-gradient(60% 56% at 10% 90%, rgba(186, 138, 96, .055), transparent 70%),
+        radial-gradient(76% 70% at 47% 47%,
+            rgba(8, 8, 10, .92) 0%,
+            rgba(8, 8, 10, .84) 44%,
+            rgba(8, 8, 10, .62) 70%,
+            rgba(8, 8, 10, .34) 100%),
+        radial-gradient(120% 110% at 50% 46%, transparent 38%, rgba(0, 0, 0, .55) 100%),
+        url('/map-bg.jpg') center / cover no-repeat,
+        /* 照片还没到 / 加载失败时退回近黑 */
+        var(--bg);
+    animation: ambientIn 1.6s var(--ease) both;
+}
+
+@keyframes ambientIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 内容必须自己压上来。这页没有 #map 那种带 z-index 的容器，
+   而 body::before 是**定位元素（z-index: 0）**，在绘制顺序里排在
+   普通流内容之上 —— 不补这几条，整页文字会被那张照片整个盖住，
+   页面上只看得到背景。 */
+.tl-head,
+.tl-main,
+.tl-foot {
+    position: relative;
+    z-index: 1;
+}
+
+/* ------------------------------------------------------------
+   页头
+   ------------------------------------------------------------ */
+
+.tl-head {
+    padding: clamp(56px, 12vh, 120px) var(--pad) clamp(28px, 6vh, 52px);
+}
+
+/* 小标和返回按钮同一行：小标靠左、按钮靠右 */
+.tl-head__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+/* 「全大写 + 大字距」的小标。数值照首页的 .hero__kicker
+   （gallery.css），站里没有通用的 .eyebrow 类 */
+.tl-head__kicker {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .42em;
+    color: rgba(255, 255, 255, .64);
+}
+
+/* 返回按钮。外观照 map.css 的 .map-bar__back（那页的顶栏胶囊），
+   这里再写一份是因为两页各引各的 CSS —— 数值要一起改 */
+.tl-head__back {
+    font-size: 12px;
+    letter-spacing: .16em;
+    color: var(--ink-2);
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    text-decoration: none;
+    transition: color .25s, border-color .25s, background .25s;
+}
+
+.tl-head__back:hover {
+    color: var(--ink);
+    background: rgba(242, 240, 236, .05);
+    border-color: rgba(242, 240, 236, .34);
+}
+
+/* 主标题的配方照 .work__title（gallery.css：字重 500 / .02em 字距 / 后面
+   一条短横线），但整页大标题比列表里那级大得多，所以是另写一组 clamp */
+.tl-head__title {
+    margin: clamp(20px, 3.5vh, 34px) 0 0;
+    font-size: clamp(30px, 5.2vw, 54px);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: .02em;
+}
+
+.tl-head__sub {
+    margin: clamp(16px, 2.6vh, 24px) 0 0;
+    max-width: 42em;
+    font-size: clamp(13.5px, 1.15vw, 15.5px);
+    line-height: 1.95;
+    color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------
+   时间轴本体
+
+   一条竖线 + 每条的圆点。竖线画在 li 上、圆点压在线上，
+   线是**连续**的（每个 li 从头画到尾），只在第一个圆点上面
+   和最后一个圆点下面各截一刀 —— 见下面 :first-child/:last-child。
+   这样年份头和条目之间的间距怎么变都不用重算线段长度。
+   ------------------------------------------------------------ */
+
+.tl {
+    /* 竖线的横坐标。圆点按它居中，所以圆点直径比它大的一圈会探出去一点点 */
+    --tl-rail-x: 8px;
+    --tl-dot: 9px;
+    --tl-dot-year: 15px;
+    /* 文字相对容器左边缘的缩进，也就是竖线到正文的距离 */
+    --tl-indent: 36px;
+    /* 圆点圆心距本条顶部的距离。⚠️ 兜底值必须写在这里（.tl 上，靠继承往下传），
+       **不能**写到 .tl > li 那条 —— 后者的优先级是 (0,1,1)，比 .tl-year /
+       .tl-item 的 (0,1,0) 高，会把它们按字号算出来的值整个盖掉，
+       年份头那个点就会静悄悄地偏到 40px 开外。踩过一次。
+       元素自己声明的值永远赢过继承来的，所以放这儿就没人跟它抢了。 */
+    --tl-dot-top: 30px;
+
+    margin: 0;
+    padding: 0 var(--pad);
+    list-style: none;
+    /* 中文长句一行 30~40 字最好读，不跟着宽屏一路拉到 1500 */
+    max-width: 800px;
+}
+
+.tl > li {
+    position: relative;
+    padding-left: var(--tl-indent);
+}
+
+/* 竖线：整条铺满这个 li，圆点再压上去 */
+.tl > li::before {
+    content: '';
+    position: absolute;
+    left: var(--tl-rail-x);
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    margin-left: -.5px;
+    background: var(--line-soft);
+}
+
+/* 第一个圆点上面不出头 */
+.tl > li:first-child::before {
+    top: var(--tl-dot-top);
+}
+
+/* 最后一个圆点下面不拖尾巴 —— 线就结束在那个点上 */
+.tl > li:last-child::before {
+    bottom: auto;
+    height: var(--tl-dot-top);
+}
+
+/* 只有一条时上面两条会叠成一小段，直接不要 */
+.tl > li:first-child:last-child::before {
+    content: none;
+}
+
+/* 条目圆点 */
+.tl > li::after {
+    content: '';
+    position: absolute;
+    left: var(--tl-rail-x);
+    top: var(--tl-dot-top);
+    width: var(--tl-dot);
+    height: var(--tl-dot);
+    /* 圆点自己的 transform，不含任何 fixed 后代，安全 */
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+/* 年份头那个节点比条目大一圈，带一圈很淡的光晕
+   （--accent-soft 是 gallery.css 里现成的那支，不另写一份 accent 的 RGB） */
+.tl-year {
+    /* 年份数字上面那块留白，也就是 li 的 padding-top */
+    --tl-pad-top: clamp(34px, 7vh, 58px);
+    --tl-year-size: clamp(26px, 3.4vw, 40px);
+    padding-top: var(--tl-pad-top);
+    /* 对准年份数字的中线：留白 + 字高的一半。
+       1.1 是 .tl-year__n 的 line-height，跟着一起改 */
+    --tl-dot-top: calc(var(--tl-pad-top) + var(--tl-year-size) * 1.1 / 2);
+}
+
+.tl-year::after {
+    width: var(--tl-dot-year);
+    height: var(--tl-dot-year);
+    box-shadow: 0 0 0 5px var(--accent-soft);
+}
+
+/* 入场动画挂在里面的**文字上**，不挂 li 本身 —— li 还带着
+   ::before 的竖线和 ::after 的圆点，整块一上浮，那条本该连续的线
+   会跟着每一组断开重拼。下面 .tl-item 那边同理，动画在 <a> 上。 */
+.tl-year__head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    animation: riseIn .62s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 55ms + 180ms);
+}
+
+.tl-year__n {
+    font-size: var(--tl-year-size);
+    font-weight: 500;
+    /* ⚠️ 这个 1.1 是 --tl-dot-top 算式里的那个，改一处要一起改 */
+    line-height: 1.1;
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+}
+
+.tl-year__count {
+    font-size: 11px;
+    letter-spacing: .28em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 年份寄语。没配的年份这一行整个不出现（js 那边不渲染），不拿别的顶替 */
+.tl-year__note {
+    margin: 10px 0 0;
+    font-size: clamp(13px, 1.05vw, 14.5px);
+    line-height: 1.9;
+    color: var(--ink-2);
+    /* 和年份那行用同一个 --i：整块一起上浮，读起来是一组 */
+    animation: riseIn .62s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 55ms + 180ms);
+}
+
+/* ---- 城市条目 ---- */
+
+.tl-item {
+    /* 同理：圆点对准城市名的中线。padding-top、边框宽度和字号都在下面那几条
+       规则里，这里引用同一组变量，改一处两边一起动。
+       ⚠️ 那 1px 的边框要算进来 —— 文字上沿是「边框 + padding」，
+       漏掉的话点会整整齐齐地高 1px（四个宽度上量出来都是 1px，不显眼但确实是错的）。 */
+    --tl-hit-border: 1px;
+    --tl-hit-pad-top: 16px;
+    --tl-city-size: clamp(17px, 1.9vw, 22px);
+    --tl-dot-top: calc(var(--tl-hit-border) + var(--tl-hit-pad-top) + var(--tl-city-size) * 1.3 / 2);
+}
+
+.tl-item__hit {
+    display: block;
+    /* 左边多垫 18px、再用负 margin 抵消：文字位置不动，
+       悬停那层底色能往左探出去一点，不至于紧贴着字 */
+    margin-left: -18px;
+    padding: var(--tl-hit-pad-top) 18px 14px;
+    color: inherit;
+    text-decoration: none;
+    background: transparent;
+    border: var(--tl-hit-border) solid transparent;
+    border-radius: 12px;
+    transition: background .22s, border-color .22s;
+    /* 错峰入场，和地图页「最近的回忆」那几行是同一套（riseIn 见文末） */
+    animation: riseIn .62s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 55ms + 180ms);
+}
+
+.tl-item__hit:hover {
+    background: rgba(255, 255, 255, .05);
+    border-color: rgba(255, 255, 255, .1);
+}
+
+.tl-item__city {
+    margin: 0;
+    font-size: var(--tl-city-size);
+    font-weight: 500;
+    /* ⚠️ 这个 1.3 是 --tl-dot-top 算式里的那个，改一处要一起改 */
+    line-height: 1.3;
+    letter-spacing: .02em;
+}
+
+.tl-item__date {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: .14em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 旅行备注 = 作品那句描述。空的时候 js 那边整行不渲染 */
+.tl-item__note {
+    margin: 9px 0 0;
+    font-size: clamp(13px, 1.05vw, 14.5px);
+    line-height: 1.85;
+    color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------
+   页脚与兜底提示
+   ------------------------------------------------------------ */
+
+/* 「另有 N 件作品没填拍摄日期」。跟地图页「未归类」是同一条规矩：
+   东西可以不入列表，但不能凭空消失、也不该让人以为是 bug */
+.tl-hint {
+    margin: clamp(18px, 3vh, 28px) 0 0;
+    /* 左边对齐到城市名那一列：--pad（容器留白）+ 36px（.tl 里那个 --tl-indent） */
+    padding: 0 var(--pad) 0 calc(var(--pad) + 36px);
+    max-width: 800px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--muted);
+}
+
+/* 一件都排不出来时的说明（后端没起来、或者还没补城市和日期）。
+   左边和上面的 .tl-hint 同一个位置 —— 这两条不会同时出现 */
+.tl-state {
+    margin: 0;
+    padding: 0 var(--pad) 0 calc(var(--pad) + 36px);
+    max-width: 800px;
+    font-size: clamp(13.5px, 1.15vw, 15.5px);
+    line-height: 1.95;
+    color: var(--ink-2);
+}
+
+.tl-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: clamp(48px, 12vh, 110px) var(--pad) clamp(40px, 8vh, 72px);
+}
+
+.tl-foot a {
+    font-size: 12px;
+    letter-spacing: .16em;
+    color: var(--ink-2);
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    text-decoration: none;
+    transition: color .25s, border-color .25s, background .25s;
+}
+
+.tl-foot a:hover {
+    color: var(--ink);
+    background: rgba(242, 240, 236, .05);
+    border-color: rgba(242, 240, 236, .34);
+}
+
+/* ------------------------------------------------------------
+   入场
+   ------------------------------------------------------------ */
+
+@keyframes riseIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------------------
+   reduced motion
+
+   ⚠️ 必须写 animation: none，**不能**只把时长改成 0：
+   这些入场都带 fill: both，时长归零会把元素钉在首帧（opacity: 0）上，
+   整页内容直接看不见。地图页踩过这个坑，那边注释里记着。
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+    body::before,
+    .tl-year__head,
+    .tl-year__note,
+    .tl-item__hit {
+        animation: none;
+    }
+}

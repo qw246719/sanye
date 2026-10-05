@@ -21,12 +21,13 @@
 /* ------------------------------------------------------------
    页面底色
 
-   原来就是一块 #08080A，从顶到最后一条边都一样，整页会显得很平。
-   这里垫一层很淡的光：中间偏上一团绿（呼应被点亮的省份）、右上角
-   一团冷色、左下角一点点暖，最后四周压一圈暗角把视线收进地图里。
+   从下往上是：背景照片 → 压暗 → 三团很淡的光 → 暗角。
+   最上面那几层原来就有：那时候底子只是一块 #08080A，从顶到最后一条边都一样，
+   整页显得很平；三团光的透明度全在 .08 以下，要的是「有深度」不是「有颜色」。
 
-   全部透明度都在 .08 以下 —— 要的是「有深度」，不是「有颜色」。
-   照片和那点亮起来的省还是唯一的主角，这层只是不让它们浮在虚空里。
+   ⚠️ 照片和压暗必须**在同一层**（都写在这条 background 里），不能照片挂 body、
+   压暗挂 ::before —— 这层有 1.6s 的 ambientIn 淡入，分开写的话加载瞬间会先闪
+   一整张没压暗的亮照片，再慢慢暗下去。合在一起就跟着一起淡入，从近黑里浮出来。
 
    挂在 body::before 上而不是 #map 上：#map 是 ECharts 的容器，
    尺寸会被反复读；canvas 本身是透明的，垫在它下面照样透得出来。
@@ -34,7 +35,9 @@
 body::before {
     content: '';
     position: fixed;
-    /* 四下多铺 10%：光晕是椭圆，铺满容器边角才不会有硬边 */
+    /* 四下多铺 10%：光晕是椭圆，铺满容器边角才不会有硬边。
+       代价是照片的 cover 是按这个放大过的盒子算的，比按视口算多裁掉一圈
+       （2560 宽的图上大约多裁 16px/边），可以接受。 */
     inset: -10%;
     z-index: 0;
     pointer-events: none;
@@ -42,7 +45,31 @@ body::before {
         radial-gradient(56% 50% at 46% 40%, rgba(155, 196, 111, .1), transparent 70%),
         radial-gradient(46% 44% at 84% 12%, rgba(96, 132, 178, .08), transparent 72%),
         radial-gradient(60% 56% at 10% 90%, rgba(186, 138, 96, .055), transparent 70%),
-        radial-gradient(120% 110% at 50% 46%, transparent 38%, rgba(0, 0, 0, .62) 100%);
+        /* 照片压暗。这张素材的太阳正好在画面正中，而地图也在正中 ——
+           不压的话那团高光、还有底下那几条雪山山脊，会把省界整个吃掉
+           （没作品的省填充只有 .042，叠在白雪上等于全白）。
+           所以**中间压得最狠、往四周松开**：地图那一块始终是暗的，
+           照片在山峦和天空那几块透出来当画框。
+           用的是 --bg 那支 (8,8,10) 而不是纯黑，跟页面底色接得上，不会有灰边。
+
+           ⚠️ 这组数值是这个画面最需要手感的一处：压得太狠照片就白放了
+           （太阳会被埋掉），压得轻一点好看但中层那几个省的边界会糊进山脊里。
+           调的时候看 1440x900 和 1366x768 两个尺寸。 */
+        radial-gradient(76% 70% at 47% 47%,
+            rgba(8, 8, 10, .92) 0%,
+            rgba(8, 8, 10, .84) 44%,
+            rgba(8, 8, 10, .62) 70%,
+            rgba(8, 8, 10, .34) 100%),
+        radial-gradient(120% 110% at 50% 46%, transparent 38%, rgba(0, 0, 0, .55) 100%),
+        /* 背景照片。路径写裸的 /map-bg.jpg（在 public/ 里，跟 /china.json 同理）——
+           ⚠️ 别套 assetUrl()，那个只给后端的 /uploads/ 补域名。
+
+           图是从 C:\xiangmu\素材\3840x2160.jpg 缩出来的：2560x1440、q82，
+           2.47MB -> 0.45MB。这台机器上没有 ImageMagick / sharp，是用浏览器 canvas
+           重编码的。原图没进仓库 —— 2.47MB 当一张背景太重了。 */
+        url('/map-bg.jpg') center / cover no-repeat,
+        /* 最后一层带颜色：照片还没到 / 加载失败时退回近黑 */
+        var(--bg);
     animation: ambientIn 1.6s var(--ease) both;
 }
 
@@ -142,6 +169,9 @@ html,
 body {
     height: 100%;
     overflow: hidden;
+    /* 照片加载失败 / 还没解析出来时的兜底，不会是一片白。
+       照片本身在 body::before 的最底层，理由见那儿。 */
+    background: var(--bg);
 }
 
 /* ------------------------------------------------------------
@@ -185,8 +215,14 @@ body {
     letter-spacing: .06em;
 }
 
-/* 有作品的省，省名前点一个小绿点（map.js 的 formatter 拼进来的）。
-   提示框里就这一处颜色，省名本身别上色 —— 一列白字里那个点就够了 */
+/* 有作品的省，省名前点一个小点（map.js 的 formatter 拼进来的）。
+   提示框里就这一处颜色，省名本身别上色 —— 一列白字里那个点就够了。
+
+   颜色和发光都**由 JS 按各省自己的色写成行内样式**，这里只留形状：
+   省份一省一色之后，这个点也得跟着那个省走，不然悬停红省旁边是个绿点。
+   `background` 这条留着当兜底 —— 行内样式没写上时至少还能看见一个点。
+   ⚠️ 原来这里硬写了一份 accent 的 RGB（rgba(155,196,111,.75)）当发光，
+   已经删掉了：那是 --accent 的第二份副本，改了 CSS 变量这里会不同步。 */
 .map-tip__dot {
     display: inline-block;
     width: 5px;
@@ -195,7 +231,6 @@ body {
     vertical-align: 1px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 8px rgba(155, 196, 111, .75);
 }
 
 .map-error {
@@ -268,6 +303,14 @@ body {
     box-shadow: 0 0 10px rgba(155, 196, 111, .85);
 }
 
+/* 顶栏右侧那一组入口。.map-bar 是 space-between，只有一个子元素时
+   它落在最右；加了第二个就得收进这个 wrapper，不然会被摆到正中间 */
+.map-bar__links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .map-bar__back {
     font-size: 12px;
     letter-spacing: .16em;
@@ -282,6 +325,86 @@ body {
     color: var(--ink);
     background: rgba(242, 240, 236, .05);
     border-color: rgba(242, 240, 236, .34);
+}
+
+/* ------------------------------------------------------------
+   左上角：城市搜索条。浮在顶栏下方、地图之上。
+
+   层级 90：压在纯地图（1）上面，但让开顶栏（100）、未归类入口（100）、
+   旅途印记（120）和省份详情（160）—— 搜索不挡那几层，反之也不被那几层
+   盖住。磨砂配方跟顶栏 / 未归类入口同一份，站里三处浮层一个味。
+
+   放左侧：顶栏右侧已经有一串导航入口，搜索条杵到右上角会跟它们挤；
+   左侧只有站名，这条窄条挂在站名下面，谁都不挡。
+   ============================================================ */
+
+.map-search {
+    position: fixed;
+    top: calc(var(--bar-h) + 14px);
+    left: var(--pad);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 4px 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(8, 8, 10, .6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+    transition: border-color .25s, background .25s, box-shadow .25s;
+    animation: barIn .8s var(--ease) .12s both;
+}
+
+.map-search:focus-within {
+    border-color: rgba(155, 196, 111, .5);
+    background: rgba(8, 8, 10, .74);
+    box-shadow: 0 0 0 3px rgba(155, 196, 111, .12);
+}
+
+.map-search__input {
+    min-width: 0;
+    width: 150px;
+    font: inherit;
+    font-size: 12.5px;
+    letter-spacing: .04em;
+    color: var(--ink);
+    background: none;
+    border: 0;
+    outline: 0;
+    /* type=search 在 WebKit 里自带的清除钮会顶到按钮上，去掉 */
+    -webkit-appearance: none;
+}
+
+.map-search__input::placeholder {
+    color: var(--ink-3, rgba(242, 240, 236, .38));
+}
+
+/* type=search 自带的 ✕ 太丑且盖着按钮，隐藏（Firefox 默认就没有） */
+.map-search__input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.map-search__btn {
+    /* button 默认用系统字体，不继承 body 的，得显式要一份 */
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: .14em;
+    color: var(--ink);
+    height: 28px;
+    padding: 0 13px;
+    margin-left: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(242, 240, 236, .08);
+    cursor: pointer;
+    transition: background .25s, color .25s;
+}
+
+.map-search__btn:hover,
+.map-search__btn:focus-visible {
+    color: #0B0B0D;
+    background: var(--accent);
 }
 
 /* ------------------------------------------------------------
@@ -320,6 +443,322 @@ body {
    压得过浏览器默认的 [hidden]{display:none}，光加属性是藏不住的
    （admin.css 里 .cover-actions .btn[hidden] 是同一个坑） */
 .uncat[hidden] {
+    display: none;
+}
+
+/* ============================================================
+   右侧浮着的统计面板「旅途印记」（桌面端；窄屏塌成底部抽屉，见下面
+   768px 那个媒体查询）
+
+   层级：地图 1 -> 顶栏 / 未归类 100 -> 这里 120 -> 省份详情 160
+   -> 灯箱 200。夹在 100 和 160 中间是必须的：它得压住左下角那个未归类
+   入口；又得被详情整个盖住（详情宽 60vw、底色不透明，正好盖满它这一条）。
+
+   ⚠️ 桌面端这一层**不带 transform 的最终态**，和 .detail 是同一条纪律。
+   这里目前没有 fixed 子元素，但窄屏那层会用到位移 —— 所以那条只写在
+   媒体查询里，桌面这条入场用的是 keyframes（末帧 transform: none，
+   fill: both 跑完不留残留）。
+   ============================================================ */
+
+.journey {
+    position: fixed;
+    /* 悬浮的一块，不贴边也不拉满：
+       - top 让开顶栏（--bar-h 是 0~60 那一条）。原来 top: 0 的话，这一层
+         z-index 120 压过顶栏的 100，右上角「作品辑 / 后台管理」两个链接
+         整个被盖住，点不着。
+       - 只给 top 和 max-height、不给 bottom，高度就跟着内容走。内容少的时候
+         是一张小卡片，不白占半屏地图；多到放不下才在里面滚（overflow-y）。 */
+    top: calc(var(--bar-h) + 22px);
+    right: 22px;
+    max-height: calc(100vh - var(--bar-h) - 44px);
+    width: clamp(300px, 24vw, 356px);
+    z-index: 120;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* 面板自己滚起来的时候不画那条滚动条：这是块纯装饰的统计卡，
+       右边杵一条 17px 的灰条很难看。**藏 ≠ 画** —— 站上仍然没有一处
+       自定义过滚动条的外观（见 gallery.css 那条 color-scheme 的说明），
+       这里只是让浏览器别画。滚轮、触摸、键盘都还能滚，overflow 没动。
+       ⚠️ 只藏这一块。列表、正文那种要滚一大段的地方不能藏 ——
+       没有滚动条，用户根本不知道下面还有东西。 */
+    scrollbar-width: none;
+    padding: 16px 20px 18px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 18px;
+    /* 规格里那个「白色 8% 磨砂」压到这块黑底上会发灰发闷 ——
+       所以分两层：上面一层白，从顶部往下淡出去（当高光），底下垫站内
+       那层深磨砂（和 .map-bar / .uncat 同一份配方） */
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02) 34%, rgba(255, 255, 255, 0) 72%),
+        rgba(8, 8, 10, .62);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+    /* 浮起来才不像一块贴上去的补丁（地图是纯黑的，这里不投影子就没有厚度） */
+    box-shadow: 0 22px 56px rgba(0, 0, 0, .55);
+    animation: journeyIn .72s var(--ease) both;
+}
+
+@keyframes journeyIn {
+    from { opacity: 0; transform: translateX(22px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* 这条和 .uncat[hidden] 同一个坑，顺手补上（地图数据挂了时 map.js 会收掉它） */
+.journey[hidden] {
+    display: none;
+}
+
+/* 上面那条 scrollbar-width 管新版浏览器，这条管老一点的 Chromium / Safari。
+   只有 display: none 一个声明 —— 不是「自定义一条细的」，是一条都不画。 */
+.journey::-webkit-scrollbar {
+    display: none;
+}
+
+.journey__eyebrow {
+    margin: 0 0 6px;
+    font-size: 10.5px;
+    letter-spacing: .3em;
+    color: var(--muted);
+}
+
+.journey__title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: .06em;
+    color: var(--ink);
+}
+
+/* ---------------- 到访城市总数 ---------------- */
+
+.journey__big {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 16px 0 0;
+}
+
+.journey__num {
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -.02em;
+    /* 整块面板唯一一处大号彩色，和详情里那个「打卡次数」用的是同一个绿 */
+    color: var(--accent-lite);
+    font-variant-numeric: tabular-nums;
+}
+
+.journey__unit {
+    font-size: 13px;
+    letter-spacing: .1em;
+    color: var(--ink-2);
+}
+
+.journey__note {
+    margin: 7px 0 0;
+    font-size: 11.5px;
+    letter-spacing: .08em;
+    color: var(--muted);
+}
+
+/* ---------------- 中国省份覆盖率 ---------------- */
+
+.journey__meter {
+    margin-top: 14px;
+}
+
+.journey__meter-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    font-size: 11px;
+    letter-spacing: .1em;
+    color: var(--ink-2);
+}
+
+.journey__meter-n {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.journey__bar {
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    /* 底槽。比面板底色再亮一点，不然这条在磨砂上是看不见的 */
+    background: rgba(255, 255, 255, .08);
+}
+
+/* 宽度由 map.js 写行内 style（见 renderJourney） */
+.journey__bar-fill {
+    width: 0;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(155, 196, 111, .6), var(--accent));
+    box-shadow: 0 0 12px rgba(155, 196, 111, .45);
+    transition: width .9s var(--ease);
+}
+
+/* ---------------- 两张小卡 ---------------- */
+
+.journey__cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin-top: 14px;
+}
+
+.journey__card {
+    padding: 9px 11px 8px;
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .045);
+}
+
+.journey__card-n {
+    display: block;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.journey__card-l {
+    display: block;
+    margin-top: 3px;
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    color: var(--muted);
+}
+
+/* ---------------- 最近的回忆 ---------------- */
+
+.journey__sec {
+    margin: 15px 0 8px;
+    font-size: 11.5px;
+    font-weight: 400;
+    letter-spacing: .18em;
+    color: var(--ink);
+}
+
+.journey__list {
+    display: grid;
+    gap: 2px;
+}
+
+/* 一行一条城市。整行是按钮（点开该城市的详情），所以按钮自带的
+   字体/边框/底色都要摘干净 */
+.journey__row {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 9px;
+    align-items: center;
+    width: 100%;
+    padding: 5px;
+    font: inherit;
+    text-align: left;
+    color: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background .22s, border-color .22s;
+    /* 和详情里那面照片墙同一套错峰（riseIn 定义在下面详情那一段里）。
+       这块面板是随页面一起来的，所以不需要 is-open 之类的开关 */
+    animation: riseIn .62s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 55ms + 180ms);
+}
+
+.journey__row:hover {
+    background: rgba(255, 255, 255, .05);
+    border-color: rgba(255, 255, 255, .1);
+}
+
+.journey__thumb {
+    display: block;
+    width: 40px;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--ph);
+}
+
+.journey__thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* 悬停推近的节奏和首页列表缩略图、详情照片墙一致（4.5% / 0.9s） */
+    transition: transform .9s var(--ease);
+}
+
+.journey__row:hover .journey__thumb img {
+    transform: scale(1.045);
+}
+
+.journey__text {
+    min-width: 0;
+}
+
+/* 城市名在左、日期靠右：同一个城市可能有好几件，只写城市名读不出「最近」 */
+.journey__row-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.journey__city {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.journey__date {
+    flex: none;
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 描述最多 50 字，这一行只放一行高，多了省略 */
+.journey__desc {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+    /* 规格里的「浅灰」，在这块磨砂上要压到半透明才不发白 */
+    color: rgba(255, 255, 255, .5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 没写描述的作品，这一行不留空 */
+.journey__desc:empty {
+    display: none;
+}
+
+.journey__empty {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    letter-spacing: .1em;
+    color: var(--muted);
+}
+
+/* 窄屏上开合那块面板的按钮。桌面上不出现（见下面媒体查询） */
+.journey-toggle {
+    display: none;
+}
+
+.journey-toggle[hidden] {
     display: none;
 }
 
@@ -753,6 +1192,108 @@ body {
         --detail-w: 100vw;
     }
 
+    /* 顶栏现在有三个东西（站名 + 时间轴入口 + 返回列表），390px 以下
+       原尺寸会挤到换行。这一档把两个胶囊都收小：字号、字距、内边距各减一档，
+       连同 gap 一起 —— 减完 360px 宽还剩富余。标题那边只收字距，
+       字号不动（它是页面的锚，缩了顶栏就散了） */
+    .map-bar__links {
+        gap: 6px;
+    }
+
+    .map-bar__back {
+        font-size: 11px;
+        letter-spacing: .08em;
+        padding: 5px 10px;
+    }
+
+    .map-bar__title {
+        letter-spacing: .14em;
+    }
+
+    /* 搜索条在窄屏上收窄：左缘仍贴边（--pad 那点边距），
+       输入框从 150px 压到 96px，按钮只留一个「搜」字 */
+    .map-search__input {
+        width: 96px;
+    }
+
+    .map-search__btn {
+        padding: 0 10px;
+        letter-spacing: .1em;
+    }
+
+    /* ------------------------------------------------------------
+       「旅途印记」在窄屏上不常驻：一块 60vh 一直压在手机上就没法看地图了。
+       收成底部抽屉，默认整个沉在屏幕外面，点右下角那个按钮才上来。
+
+       ⚠️ animation: none 这条不能省。上面那条入场用的是 translateX，
+       而 animation 带 fill: both 时优先级高过普通声明 —— 不关掉的话，
+       末帧那个 transform: none 会盖住这里的 translateY(100%)，
+       抽屉一进页面就是打开着的，而且怎么点都收不回去。
+       ------------------------------------------------------------ */
+    .journey {
+        /* 桌面那套「浮在右上角」的几何在这里全要拆掉：抽屉是贴底、通栏的。
+           max-height / box-shadow 尤其别漏 —— 留着的话高度会被上面那条算式
+           掐住，60vh 就不生效了 */
+        top: auto;
+        right: 0;
+        bottom: 0;
+        max-height: none;
+        height: 60vh;
+        width: 100%;
+        /* 底下那个按钮浮在面板上面，最后一行别被它压住 */
+        padding: 26px 22px 84px;
+        border: 0;
+        border-top: 1px solid rgba(255, 255, 255, .1);
+        border-radius: 18px 18px 0 0;
+        box-shadow: none;
+        transform: translateY(100%);
+        /* 光靠位移藏不住：沉下去的那块还在 Tab 顺序里，键盘能走到看不见的行上。
+           visibility 才是真的「不在」，但它不能立刻生效 —— 立刻翻会把
+           这 .42s 的滑出一起切掉，所以延迟到滑完再翻（和 .detail 那边同一套路数） */
+        visibility: hidden;
+        transition: transform .42s var(--ease), visibility 0s linear .42s;
+        animation: none;
+    }
+
+    .journey.is-open {
+        transform: none;
+        visibility: visible;
+        transition: transform .42s var(--ease), visibility 0s;
+    }
+
+    .journey-toggle {
+        position: fixed;
+        right: var(--pad);
+        bottom: clamp(20px, 4vh, 34px);
+        /* 压在面板（120）上面才点得着 —— 它是这块面板的开关，
+           开着的时候正是要靠它收回去。详情（160）仍然盖得住它 */
+        z-index: 130;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        /* button 默认用系统字体，不继承 body 的，得显式要一份 */
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: .12em;
+        color: var(--ink-2);
+        background: rgba(8, 8, 10, .72);
+        -webkit-backdrop-filter: blur(20px) saturate(1.3);
+        backdrop-filter: blur(20px) saturate(1.3);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: color .25s, background .25s, border-color .25s;
+    }
+
+    /* 开着的时候按钮是绿的：这块面板盖住了大半个屏幕，
+       按钮得说明白「再点一下就收」 */
+    .journey-toggle[aria-expanded="true"] {
+        color: var(--ink);
+        background: rgba(155, 196, 111, .12);
+        border-color: rgba(155, 196, 111, .5);
+    }
+
     .detail__hero {
         height: clamp(260px, 44vh, 380px);
     }
@@ -796,8 +1337,11 @@ body {
     .boot,
     .boot__dot,
     .map-bar,
+    .map-search,
     .uncat,
     #map.is-ready,
+    .journey,
+    .journey__row,
     .detail.is-open .detail__head > *,
     .detail.is-open .detail__stats > *,
     .detail.is-open .detail__sec,
@@ -813,5 +1357,22 @@ body {
 
     .detail.is-open .detail__img {
         transform: none;
+    }
+
+    /* 进度条那条 0.9s 的推进也省了 */
+    .journey__bar-fill {
+        transition: none;
+    }
+}
+
+/* 窄屏那块抽屉的开合（.42s 的位移）也缩短。写在正常那条媒体查询**之后** ——
+   两条特异性一样，靠顺序压过去 */
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+    .journey {
+        transition: visibility 0s linear .2s;
+    }
+
+    .journey.is-open {
+        transition: visibility 0s;
     }
 }
