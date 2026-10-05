@@ -516,7 +516,7 @@ function renderList() {
                 <img src="${escapeHtml(assetUrl(w.beforeUrl))}" alt="${escapeHtml(w.title)} 修图前" decoding="async">
             </div>
             <div>
-                <h3 class="admin-item__title" title="${escapeHtml(w.title)}">${escapeHtml(w.title)}</h3>
+                <h4 class="admin-item__title" title="${escapeHtml(w.title)}">${escapeHtml(w.title)}</h4>
                 ${w.desc ? `<p class="admin-item__desc">${escapeHtml(w.desc)}</p>` : ''}
                 <div class="admin-item__sub">
                     <span>${escapeHtml(provinceLabel(w))}</span>

@@ -1,14 +1,100 @@
 /* ============================================================
    后台管理页样式（在 style.css 基础上叠加）
    配色全部走 style.css 的变量，这里只写布局和几个黑底专用的补丁。
+
+   页面结构：页头 -> 若干 .admin-group（每组一个标题 + 一个 .admin-grid）。
+   组内的 .admin-grid 负责分栏，组和组之间靠 .admin-group + .admin-group 拉开。
    ============================================================ */
 
-.admin-layout {
+.admin-page {
+    padding: 30px 0 80px;
+}
+
+/* ---------------- 页头 ---------------- */
+
+/* 原来这页没有标题，从顶栏直接掉进四个面板里，看不出这是个什么页面。
+   加一行 h1，顺便把「什么在哪儿」一句话说完 */
+.admin-head {
+    margin-bottom: 34px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-head__title {
+    margin: 0 0 9px;
+    font-size: 22px;
+    font-weight: 550;
+    letter-spacing: .04em;
+}
+
+.admin-head__note {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+/* ---------------- 分组 ---------------- */
+
+.admin-group + .admin-group {
+    margin-top: 44px;
+}
+
+/* 标题 + 一句说明 + 一条化开的细线拉到栏末。就靠这条线把「一组到哪儿为止」
+   说清楚 —— 不加它的话，两组之间只剩一段空白，跟原来一样分不出边界 */
+.admin-group__head {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 16px;
+}
+
+.admin-group__title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .2em;
+    white-space: nowrap;
+}
+
+/* 标题前一小条绿。整页只有两处，是这两组的记号 */
+.admin-group__title::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 13px;
+    margin-right: 10px;
+    vertical-align: -1px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+
+.admin-group__note {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.admin-group__head::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    min-width: 20px;
+    background: linear-gradient(to right, var(--border), transparent 82%);
+}
+
+.admin-grid {
     display: grid;
-    grid-template-columns: 400px 1fr;
-    gap: 28px;
+    gap: 22px;
     align-items: start;
-    padding: 32px 0 72px;
+}
+
+/* 「作品」那组：左边表单宽度定死 400px，右边列表把剩下的都吃掉 */
+.admin-grid--main {
+    grid-template-columns: 400px 1fr;
+}
+
+/* 「站点设置」那组：两块一样重，对半分 */
+.admin-grid--even {
+    grid-template-columns: 1fr 1fr;
 }
 
 .panel {
@@ -30,10 +116,22 @@
     font-size: 17px;
 }
 
+/* 作品列表标题右边那个「（共 N 件）」。原来写在标签的 style 属性里，
+   挪出来是因为标题的排版不该散在 HTML 里 */
+.panel__title-count {
+    color: var(--muted);
+    font-weight: 400;
+}
+
 .panel__desc {
     margin: 0 0 20px;
     font-size: 13px;
     color: var(--muted);
+}
+
+/* 占满一行。原来是标签上的 style="width:100%" */
+.btn--block {
+    width: 100%;
 }
 
 /* 描述框右边那个字数计数器 */
@@ -177,10 +275,35 @@
 
 /* ---------------- 省份设置 ---------------- */
 
-/* 介绍那块顶在背景图那组按钮下面，得自己留一段间隔 ——
-   .field 只有下边距，挨着 .cover-actions 会贴到一起 */
-.note-field {
-    margin-top: 20px;
+/* 一个省有背景图和介绍两份东西、两个保存按钮，拆成两个小节。
+   小节之间用一条通栏细线断开 —— 原来两组按钮紧挨着排在同一个面板里，
+   而「上传背景图」和「保存介绍」都是绿的，很容易误点 */
+.sub-block + .sub-block {
+    margin-top: 26px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.sub-block__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.sub-block__title {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: .06em;
+}
+
+.sub-block__note {
+    margin: 0 0 14px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
 }
 
 /* .input 那套（内边距、边框、圆角）textarea 上照样成立，这里只补它自己缺的：
@@ -244,7 +367,10 @@
     object-fit: cover;
 }
 
+/* 字号写死：它是 h4 了（原来 h3），不写的话大小由浏览器的默认标题样式决定，
+   换个标签就跟着变一档 */
 .admin-item__title {
+    font-size: 15px;
     font-weight: 600;
     margin: 0 0 5px;
     overflow: hidden;
@@ -273,12 +399,35 @@
 }
 
 @media (max-width: 960px) {
-    .admin-layout {
+    .admin-grid--main {
         grid-template-columns: 1fr;
     }
 
     .admin-col {
         gap: 20px;
+    }
+}
+
+/* 「站点设置」那组两块都能压到 400px 出头还看得过去，所以比上面晚一步拆 */
+@media (max-width: 820px) {
+    .admin-grid--even {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 窄屏上标题、说明、那条细线挤在一行会互相压，索性各占一行 */
+@media (max-width: 620px) {
+    .admin-group__head {
+        display: block;
+    }
+
+    .admin-group__head::after {
+        display: none;
+    }
+
+    .admin-group__note {
+        display: block;
+        margin-top: 7px;
     }
 }
 

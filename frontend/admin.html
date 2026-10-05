@@ -24,134 +24,193 @@
     </div>
 </header>
 
-<main class="container admin-layout">
+<!-- ============================================================
+     后台分两组：
 
-    <!-- 左栏：上传表单 -->
-    <div class="admin-col">
+       「作品」      —— 天天要动的内容：传新的一张、删旧的一张
+       「站点设置」  —— 偶尔改一次的配置：首页封面、各省的背景图和介绍
 
-        <section class="panel">
-            <h2 class="panel__title">上传新作品</h2>
-            <p class="panel__desc">上传同一张图修图前 / 修图后两个版本，勾上拍摄地所在的省份。标题和描述会一起出现在首页照片旁边，省份决定它在地图上点亮哪儿。</p>
+     原来这四块是三个一样的面板摞在左边一栏、作品列表单独站右边，
+     结果是左栏两米多高、右栏下面空着一大片，而且「传作品」和
+     「改站点设置」看上去完全一样重，落地不知道该从哪儿下手。
+     现在每块归到一组、组有名字，同一组里的两栏高度也配得上。
+     ============================================================ -->
+<main class="container admin-page">
 
-            <form id="uploadForm" novalidate>
-                <div class="field">
-                    <label for="title">作品标题</label>
-                    <input class="input" type="text" id="title" name="title"
-                           placeholder="例如：海边人像精修" maxlength="40" required>
-                </div>
+    <header class="admin-head">
+        <h1 class="admin-head__title">后台管理</h1>
+        <p class="admin-head__note">作品在「作品」那组里传和删；换首页封面、改省份的背景图和介绍在「站点设置」。</p>
+    </header>
 
-                <div class="field">
-                    <label for="desc">
-                        一句话描述
-                        <span class="field__count" id="descCount">0 / 50</span>
-                    </label>
-                    <input class="input" type="text" id="desc" name="desc"
-                           placeholder="例如：等了四十分钟，浪才拍到礁石上" maxlength="50">
-                </div>
+    <section class="admin-group" aria-labelledby="groupWorks">
+        <div class="admin-group__head">
+            <h2 class="admin-group__title" id="groupWorks">作品</h2>
+            <span class="admin-group__note">传新的一张，或者删掉已经发出去的</span>
+        </div>
 
-                <!-- 省份多选。用一排按钮而不是 <select multiple>：后者要按住
-                     Ctrl 才多选，触屏上基本没法用，而且选中态是系统画的。
-                     这排按钮由 admin.js 从 provinces.js 渲染，不依赖接口 -->
-                <div class="field">
-                    <label id="provLabel">
-                        省份
-                        <span class="field__count" id="provCount">未归类</span>
-                    </label>
-                    <div class="chips" id="provinceChips" role="group" aria-labelledby="provLabel"></div>
-                    <p class="field__hint">
-                        可多选 —— 一张照片横跨两个省（比如川藏线）就都勾上。一个都不勾就归入「未归类」，
-                        只会出现在地图左下角那个入口里。
+        <div class="admin-grid admin-grid--main">
+
+            <!-- 左：上传表单 -->
+            <div class="admin-col">
+                <section class="panel">
+                    <h3 class="panel__title">上传新作品</h3>
+                    <p class="panel__desc">
+                        同一张图的前后两个版本，勾上拍摄地所在的省份。标题和描述会跟着照片出现在首页，
+                        省份决定它在地图上点亮哪儿。
                     </p>
+
+                    <form id="uploadForm" novalidate>
+                        <div class="field">
+                            <label for="title">作品标题</label>
+                            <input class="input" type="text" id="title" name="title"
+                                   placeholder="例如：海边人像精修" maxlength="40" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="desc">
+                                一句话描述
+                                <span class="field__count" id="descCount">0 / 50</span>
+                            </label>
+                            <input class="input" type="text" id="desc" name="desc"
+                                   placeholder="例如：等了四十分钟，浪才拍到礁石上" maxlength="50">
+                        </div>
+
+                        <!-- 省份多选。用一排按钮而不是 <select multiple>：后者要按住
+                             Ctrl 才多选，触屏上基本没法用，而且选中态是系统画的。
+                             这排按钮由 admin.js 从 provinces.js 渲染，不依赖接口 -->
+                        <div class="field">
+                            <label id="provLabel">
+                                省份
+                                <span class="field__count" id="provCount">未归类</span>
+                            </label>
+                            <div class="chips" id="provinceChips" role="group" aria-labelledby="provLabel"></div>
+                            <p class="field__hint">
+                                可多选 —— 一张照片横跨两个省（比如川藏线）就都勾上。一个都不勾就归入「未归类」，
+                                只会出现在地图左下角那个入口里。
+                            </p>
+                        </div>
+
+                        <div class="field">
+                            <label>图片（Before / After 建议同尺寸同比例）</label>
+                            <div class="upload-row">
+                                <div class="upload-box">
+                                    <span class="upload-box__label upload-box__label--before">BEFORE 原图</span>
+                                    <input type="file" id="beforeFile" accept="image/*" required>
+                                    <div class="upload-box__preview" id="beforePreview">未选择</div>
+                                </div>
+                                <div class="upload-box">
+                                    <span class="upload-box__label upload-box__label--after">AFTER 成片</span>
+                                    <input type="file" id="afterFile" accept="image/*" required>
+                                    <div class="upload-box__preview" id="afterPreview">未选择</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn--primary btn--block" type="submit" id="submitBtn">提交作品</button>
+                    </form>
+                </section>
+            </div>
+
+            <!-- 右：作品列表 -->
+            <section class="panel">
+                <h3 class="panel__title">
+                    作品列表
+                    <span class="panel__title-count" id="count"></span>
+                </h3>
+                <p class="panel__desc">删除会同时移除服务器上的两张图片，不可恢复。</p>
+                <div class="admin-list" id="adminList"></div>
+            </section>
+
+        </div>
+    </section>
+
+    <section class="admin-group" aria-labelledby="groupSite">
+        <div class="admin-group__head">
+            <h2 class="admin-group__title" id="groupSite">站点设置</h2>
+            <span class="admin-group__note">跟具体某件作品无关，改的是整站或者某个省的样子</span>
+        </div>
+
+        <div class="admin-grid admin-grid--even">
+
+            <section class="panel">
+                <h3 class="panel__title">首页封面</h3>
+                <p class="panel__desc">
+                    首屏铺满整屏的那张图，会按比例裁切填满，<strong>建议横构图</strong>（内置那张是 1920 × 1200）。
+                    它也是进页面最先看到的一张，别传太大的原图。
+                </p>
+
+                <div class="cover-preview" id="coverPreview">加载中…</div>
+
+                <div class="field cover-field">
+                    <label for="coverFile">选择图片</label>
+                    <input type="file" id="coverFile" accept="image/*">
                 </div>
 
+                <div class="cover-actions">
+                    <button class="btn btn--primary" type="button" id="coverSubmit">上传封面</button>
+                    <button class="btn" type="button" id="coverReset" hidden>恢复默认</button>
+                </div>
+            </section>
+
+            <!-- 一个省两份东西、两个保存按钮，所以拆成两个小节各管各的。
+                 原来两组按钮挨着排在同一个面板里，很容易按错那个 ——
+                 尤其「上传背景图」和「保存介绍」都是绿的 -->
+            <section class="panel">
+                <h3 class="panel__title">省份设置</h3>
+                <p class="panel__desc">
+                    地图页点开某个省时的两样东西，各存各的。省份本身是固定的（跟着地图数据走，改不了），
+                    上面换一个省，下面两块一起跟着换。
+                </p>
+
                 <div class="field">
-                    <label>图片（Before / After 建议同尺寸同比例）</label>
-                    <div class="upload-row">
-                        <div class="upload-box">
-                            <span class="upload-box__label upload-box__label--before">BEFORE 原图</span>
-                            <input type="file" id="beforeFile" accept="image/*" required>
-                            <div class="upload-box__preview" id="beforePreview">未选择</div>
-                        </div>
-                        <div class="upload-box">
-                            <span class="upload-box__label upload-box__label--after">AFTER 成片</span>
-                            <input type="file" id="afterFile" accept="image/*" required>
-                            <div class="upload-box__preview" id="afterPreview">未选择</div>
-                        </div>
+                    <label for="profileProvince">省份</label>
+                    <select class="input" id="profileProvince"></select>
+                </div>
+
+                <div class="sub-block">
+                    <h4 class="sub-block__title">顶部背景图</h4>
+                    <p class="sub-block__note">
+                        没传过的省走深色渐变底色，<strong>不会</strong>拿最新作品顶上。
+                    </p>
+
+                    <div class="cover-preview" id="provinceCoverPreview">加载中…</div>
+
+                    <div class="field cover-field">
+                        <label for="provinceCoverFile">选择图片</label>
+                        <input type="file" id="provinceCoverFile" accept="image/*">
+                    </div>
+
+                    <div class="cover-actions">
+                        <button class="btn btn--primary" type="button" id="provinceCoverSubmit">上传背景图</button>
+                        <button class="btn" type="button" id="provinceCoverReset" hidden>恢复默认</button>
+                        <span class="note-state" id="provinceCoverState"></span>
                     </div>
                 </div>
 
-                <button class="btn btn--primary" type="submit" id="submitBtn" style="width:100%">提交作品</button>
-            </form>
-        </section>
+                <div class="sub-block">
+                    <!-- 标题就是「介绍」，里面不再套一个同名 label ——
+                         字数计数器挪到这小节的标题行右边，跟上面「背景图」的
+                         「选择图片」并列读起来才是一件事一个标题 -->
+                    <div class="sub-block__head">
+                        <h4 class="sub-block__title">介绍</h4>
+                        <span class="field__count" id="noteCount">0 / 200</span>
+                    </div>
+                    <p class="sub-block__note">显示在省名下面那一行，最多 200 字。</p>
 
-        <section class="panel">
-            <h2 class="panel__title">首页封面</h2>
-            <p class="panel__desc">
-                首屏铺满整屏的那张图，会按比例裁切填满，<strong>建议横构图</strong>（内置那张是 1920 × 1200）。
-                它也是进页面最先看到的一张，别传太大的原图。
-            </p>
+                    <div class="field">
+                        <textarea class="input note-text" id="noteText" rows="4" maxlength="200"
+                                  aria-label="省份介绍"
+                                  placeholder="例如：前后去了四次，从雨季走到雪季。"></textarea>
+                    </div>
 
-            <div class="cover-preview" id="coverPreview">加载中…</div>
+                    <div class="cover-actions">
+                        <button class="btn btn--primary" type="button" id="noteSubmit">保存介绍</button>
+                        <span class="note-state" id="noteState"></span>
+                    </div>
+                </div>
+            </section>
 
-            <div class="field cover-field">
-                <label for="coverFile">选择图片</label>
-                <input type="file" id="coverFile" accept="image/*">
-            </div>
-
-            <div class="cover-actions">
-                <button class="btn btn--primary" type="button" id="coverSubmit">上传封面</button>
-                <button class="btn" type="button" id="coverReset" hidden>恢复默认</button>
-            </div>
-        </section>
-
-        <section class="panel">
-            <h2 class="panel__title">省份设置</h2>
-            <p class="panel__desc">
-                地图页点开某个省时的两样东西：顶部那张<strong>背景图</strong>，和大标题下面那段<strong>介绍</strong>。
-                省份本身是固定的（跟着地图数据走，改不了），换一个省就是换一份，各存各的。
-                没传背景图的省走深色渐变底色，<strong>不会</strong>拿最新作品顶上。
-            </p>
-
-            <div class="field">
-                <label for="profileProvince">省份</label>
-                <select class="input" id="profileProvince"></select>
-            </div>
-
-            <div class="cover-preview" id="provinceCoverPreview">加载中…</div>
-
-            <div class="field cover-field">
-                <label for="provinceCoverFile">背景图</label>
-                <input type="file" id="provinceCoverFile" accept="image/*">
-            </div>
-
-            <div class="cover-actions">
-                <button class="btn btn--primary" type="button" id="provinceCoverSubmit">上传背景图</button>
-                <button class="btn" type="button" id="provinceCoverReset" hidden>恢复默认</button>
-                <span class="note-state" id="provinceCoverState"></span>
-            </div>
-
-            <div class="field note-field">
-                <label for="noteText">
-                    介绍
-                    <span class="field__count" id="noteCount">0 / 200</span>
-                </label>
-                <textarea class="input note-text" id="noteText" rows="4" maxlength="200"
-                          placeholder="例如：前后去了四次，从雨季走到雪季。"></textarea>
-            </div>
-
-            <div class="cover-actions">
-                <button class="btn btn--primary" type="button" id="noteSubmit">保存介绍</button>
-                <span class="note-state" id="noteState"></span>
-            </div>
-        </section>
-
-    </div>
-
-    <!-- 右：作品列表 -->
-    <section class="panel">
-        <h2 class="panel__title">作品列表 <span id="count" style="color:var(--muted);font-weight:400"></span></h2>
-        <p class="panel__desc">删除会同时移除服务器上的两张图片，不可恢复。</p>
-        <div class="admin-list" id="adminList"></div>
+        </div>
     </section>
 
 </main>
