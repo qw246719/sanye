@@ -89,25 +89,51 @@ export function clearCover() {
     return request('/api/site-config/cover', { method: 'DELETE' });
 }
 
-/** 省份介绍字数上限，和后端 ProvinceNoteService.NOTE_MAX 保持一致 */
+/** 省份介绍字数上限，和后端 ProvinceProfileService.NOTE_MAX 保持一致 */
 export const NOTE_MAX = 200;
 
 /**
- * GET /api/province-notes —— 全部省份介绍，形如 { "四川省": "..." }
+ * GET /api/province-profiles —— 全部省份设置，形如
+ * { "四川省": { "note": "...", "cover": "/uploads/xxx.jpg" } }
  *
- * 没写过的省不在这个表里，取不到就是没介绍。地图页拿它填详情里那段文字。
+ * 没设置过的省不在这个表里。地图页拿 note 填详情里那段文字、拿 cover 当详情顶上的背景图。
+ * 两个字段都可能是空串（只写了介绍、或只传了图）。
  */
-export function fetchProvinceNotes() {
-    return request('/api/province-notes');
+export function fetchProvinceProfiles() {
+    return request('/api/province-profiles');
 }
 
-/** PUT /api/province-note —— 保存一个省的介绍；note 传空串就是清掉 */
+/**
+ * PUT /api/province-profile —— 保存一个省的介绍；note 传空串就是清掉。
+ * 只动介绍这一个字段，这个省已经传过的背景图不受影响（后端那边是分开写的）。
+ */
 export function saveProvinceNote(province, note) {
-    return request('/api/province-note', {
+    return request('/api/province-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ province, note: note || '' }),
     });
+}
+
+/**
+ * POST /api/province-cover —— 上传/替换一个省的背景图。
+ * province 走表单字段（不是 URL），中文省名不用编码。
+ */
+export function uploadProvinceCover(province, file) {
+    const fd = new FormData();
+    fd.append('province', province);
+    fd.append('file', file);
+    return request('/api/province-cover', { method: 'POST', body: fd });
+}
+
+/**
+ * DELETE /api/province-cover?province=… —— 清掉背景图（恢复成底色渐变），介绍保留。
+ *
+ * 省名必须 encodeURIComponent：这里是拼进 URL 的，中文直接拼进去
+ * 有些环境会当成非法字符，或者按错的编码解出另一个省名。
+ */
+export function clearProvinceCover(province) {
+    return request(`/api/province-cover?province=${encodeURIComponent(province)}`, { method: 'DELETE' });
 }
 
 /** 顶部提示条 */

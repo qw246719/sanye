@@ -105,18 +105,32 @@
         </section>
 
         <section class="panel">
-            <h2 class="panel__title">省份介绍</h2>
+            <h2 class="panel__title">省份设置</h2>
             <p class="panel__desc">
-                地图页点开某个省时，大标题下面那段文字。省份本身是固定的（跟着地图数据走，改不了），
-                能改的只有这段介绍 —— 换一个省就是换一份，各存各的。
+                地图页点开某个省时的两样东西：顶部那张<strong>背景图</strong>，和大标题下面那段<strong>介绍</strong>。
+                省份本身是固定的（跟着地图数据走，改不了），换一个省就是换一份，各存各的。
+                没传背景图的省走深色渐变底色，<strong>不会</strong>拿最新作品顶上。
             </p>
 
             <div class="field">
-                <label for="noteProvince">省份</label>
-                <select class="input" id="noteProvince"></select>
+                <label for="profileProvince">省份</label>
+                <select class="input" id="profileProvince"></select>
             </div>
 
-            <div class="field">
+            <div class="cover-preview" id="provinceCoverPreview">加载中…</div>
+
+            <div class="field cover-field">
+                <label for="provinceCoverFile">背景图</label>
+                <input type="file" id="provinceCoverFile" accept="image/*">
+            </div>
+
+            <div class="cover-actions">
+                <button class="btn btn--primary" type="button" id="provinceCoverSubmit">上传背景图</button>
+                <button class="btn" type="button" id="provinceCoverReset" hidden>恢复默认</button>
+                <span class="note-state" id="provinceCoverState"></span>
+            </div>
+
+            <div class="field note-field">
                 <label for="noteText">
                     介绍
                     <span class="field__count" id="noteCount">0 / 200</span>

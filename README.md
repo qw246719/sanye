@@ -10,14 +10,14 @@ sanye/
 │   └── src/main/java/com/sanye/
 │       ├── common/     Result 统一响应 / 业务异常 / 全局异常处理
 │       ├── config/     /uploads/** 静态映射 + CORS
-│       ├── controller/ Work / SiteConfig / ProvinceNote / Root
-│       ├── model/      Work、SiteConfig、FontPreset、ProvinceNote
-│       └── service/    WorkService、SiteConfigService、ProvinceNoteService、FileStorageService
+│       ├── controller/ Work / SiteConfig / ProvinceProfile / Root
+│       ├── model/      Work、SiteConfig、FontPreset、ProvinceProfile（存下来的）、ProvinceNote（PUT 的请求体）
+│       └── service/    WorkService、SiteConfigService、ProvinceProfileService、FileStorageService
 └── frontend/           原生三件套 + Vite
     ├── package.json
     ├── vite.config.js  开发代理：/api、/uploads -> localhost:8080
     ├── index.html      作品辑（整屏封面 + 作品列表 + 灯箱）
-    ├── admin.html      后台管理页（上传 / 删除 / 换首页封面 / 写省份介绍）
+    ├── admin.html      后台管理页（上传 / 删除 / 换首页封面 / 设省份背景图和介绍）
     ├── map.html        作品地图（按省份看作品，点开是从右侧拉出的半屏省份详情）
     ├── public/cover.jpg    首屏封面的兜底图，后台没传过自定义封面时用它
     ├── public/china.json   中国地图的 GeoJSON，地图页的数据源（569 KB）
@@ -77,8 +77,10 @@ npm run dev
 | POST | `/api/site-config/cover` | 上传 / 替换首屏封面 | `multipart/form-data`：`file`（单张图，≤10MB） |
 | DELETE | `/api/site-config/cover` | 恢复内置封面，并把上传那张删掉 | — |
 | GET | `/api/fonts` | 首屏艺术字体预设列表 | — |
-| GET | `/api/province-notes` | 省份介绍，形如 `{"四川省": "..."}`，没写过的省不在表里 | — |
-| PUT | `/api/province-note` | 保存一个省的介绍 | JSON：`province`、`note`（`note` 传空串 = 清掉这个省） |
+| GET | `/api/province-profiles` | 全部省份设置，形如 `{"四川省": {"note": "...", "cover": "/uploads/xxx.jpg"}}`，没设置过的省不在表里 | — |
+| PUT | `/api/province-profile` | 保存一个省的介绍，**不碰背景图** | JSON：`province`、`note`（`note` 传空串 = 清掉这段介绍） |
+| POST | `/api/province-cover` | 上传 / 替换一个省的背景图，**不碰介绍** | `multipart/form-data`：`province`、`file`（单张图，≤10MB） |
+| DELETE | `/api/province-cover` | 清掉一个省的背景图（回到底色渐变），**介绍保留** | query：`province`（中文要 `encodeURIComponent`） |
 
 图片通过 `/uploads/**` 暴露，接口返回的 `beforeUrl` / `afterUrl` / `coverUrl` 形如 `/uploads/xxx.png`，前端用 `assetUrl()` 补成完整地址。
 
@@ -97,8 +99,14 @@ curl -X POST http://localhost:8080/api/work \
 curl -X DELETE http://localhost:8080/api/work/1
 
 # 保存某个省的介绍（JSON 带中文，同上，从 UTF-8 文件读）
-curl -X PUT http://localhost:8080/api/province-note \
+curl -X PUT http://localhost:8080/api/province-profile \
   -H 'Content-Type: application/json' --data-binary @note.json
+
+# 传一个省的背景图。province 是表单字段，中文同样得从文件读（见下面那条）
+curl -X POST http://localhost:8080/api/province-cover \
+  -F "province=<province.txt" -F "file=@cover.jpg"
+
+curl -X DELETE "http://localhost:8080/api/province-cover?province=%E5%9B%9B%E5%B7%9D%E7%9C%81"
 ```
 
 > 在 Git Bash 里测中文标题会乱码（shell 按本地码页编码参数），改成从文件读：
@@ -106,6 +114,12 @@ curl -X PUT http://localhost:8080/api/province-note \
 >
 > 同理，任何带中文的 JSON 请求体别直接写在 `-d` 里，用 `--data-binary @body.json`
 > 从 UTF-8 文件读，否则后端会报 `JSON parse error: Invalid UTF-8`。
+>
+> **multipart 的文本字段更阴**：`-F "province=四川省"` 不会报错，那几个字节会被
+> 当成合法的「另一个字符串」收下（GBK 的 `四川省` 被当 UTF-8 解就成了乱码省名），
+> 于是表里多出一个谁也点不开的键。要么用 `-F "province=<province.txt"` 从文件读，
+> 要么干脆用浏览器 / Node 的 `FormData` 走一遍（`frontend/js/api.js` 就是这么发的，
+> 浏览器一定发 UTF-8，后端也一定按 UTF-8 解）。
 
 ## 前后端怎么连上的
 
@@ -181,7 +195,7 @@ server {
 
 **省份详情**（点地图上有作品的省，或者左下角那个「未归类作品」）
 
-从右侧拉出的**半屏面板，不是新页面** —— 只盖住右边（`--detail-w: clamp(460px, 60vw, 940px)`，窄屏覆盖成 `100vw`），左边的地图仍然露着。地图的缩放平移状态也留在下面，返回时还是刚才那张图，不用重画也不用重拉数据。从上到下：该省最新那件作品的成片当 Hero、左上角固定的圆形返回按钮、右上角作品数、一行年份、省名大标题、省份介绍（后台可改，见下）、一行统计（打卡次数 / 第一次 / 最近）、「省份影像」标题紧跟着一句「已更新 2026.05.14」，最后是一面两列照片墙。文字一律**靠左**，但分两条竖线：Hero 里的年份、省名、介绍贴得更靠边（`--head-pad`，1440 屏上 26px），下面正文那列（统计 / 区块标题 / 照片墙）走站点通用的 `--pad`（72px）。这个错开是有意的，理由见下面的条目。
+从右侧拉出的**半屏面板，不是新页面** —— 只盖住右边（`--detail-w: clamp(460px, 60vw, 940px)`，窄屏覆盖成 `100vw`），左边的地图仍然露着。地图的缩放平移状态也留在下面，返回时还是刚才那张图，不用重画也不用重拉数据。从上到下：该省在后台配的**背景图**当 Hero、左上角固定的圆形返回按钮、右上角作品数、一行年份、省名大标题、省份介绍（后台可改，见下）、一行统计（打卡次数 / 第一次 / 最近）、「省份影像」标题紧跟着一句「已更新 2026.05.14」，最后是一面两列照片墙。文字一律**靠左**，但分两条竖线：Hero 里的年份、省名、介绍贴得更靠边（`--head-pad`，1440 屏上 26px），下面正文那列（统计 / 区块标题 / 照片墙）走站点通用的 `--pad`（72px）。这个错开是有意的，理由见下面的条目。
 
 几个实现上的点：
 
@@ -195,15 +209,27 @@ server {
 - **Hero 里的文字比正文更贴左边，是故意的**：`.detail__head` 用自己的一份 `--head-pad: clamp(20px, 1.8vw, 30px)`，不跟正文共用 `--pad`。Hero 是铺满整块面板的图，省名和介绍站在它自己的左缘；1440 屏上名字内缩 26px、正文内缩 72px。窄屏（≤390px 一带）两者都退到 20px、看不出差别，只有宽屏才错开。别看到数值不一样就把两处"统一"掉。
 - 注意返回按钮在 `--pad` 那条线（正文那一列），不在 `--head-pad` 那条 —— 它跟省名横向差着 40 多像素，纵向隔着大半个 Hero，视觉上是个浮动控件，不跟着标题走。
 
-**省份介绍**：省份本身是固定的（跟着 `china.json` 的 feature 名走，改不了），能改的只有它下面那段文字。存在 `data/province-notes.json`，就是一个 `{"四川省": "..."}` 的表，走 `ProvinceNoteService`（落盘方式和另外两个 Service 一样：先写 `.tmp` 再原子替换）。
+**省份设置**：省份本身是固定的（跟着 `china.json` 的 feature 名走，改不了），能改的是这个省的两样东西 —— 顶上那张**背景图**，和它下面那段**介绍**。存在 `data/province-profiles.json`，就是一个 `{"四川省": {"note": "…", "cover": "/uploads/…"}}` 的表，走 `ProvinceProfileService`（落盘方式和另外两个 Service 一样：先写 `.tmp` 再原子替换）。
 
-> 单独一个 Service 配一份文件，而**不是**往 `SiteConfig` 里加字段：那份配置加字段得同时改 `copyOf` / `normalize` / `update` 三处，漏一处就静默丢数据（下面「需要注意」里记着这条）。这里一个省一个键，写成 Map 更贴合，后台存一个省也碰不到别的省。介绍传空串 = 把这个键删掉，文件里不会攒一堆空字符串。
+> 单独一个 Service 配一份文件，而**不是**往 `SiteConfig` 里加字段：那份配置加字段得同时改 `copyOf` / `normalize` / `update` 三处，漏一处就静默丢数据（下面「需要注意」里记着这条）。这里一个省一个键，写成 Map 更贴合，后台存一个省也碰不到别的省。
+
+几条容易改坏的约定：
+
+- **两个字段各走各的接口，每个只动自己那个**。保存介绍不会碰背景图，换背景图也不会碰介绍 —— 后台那两块也是各自提交的。后端的方法是拿当前记录起手、只覆盖自己那个字段，而不是从零 `new` 一个（跟 `SiteConfigService.update()` 不碰 `coverUrl` 是同一条理由）。
+- **省名要先验再存图**。`updateCover()` 里 `checkProvince()` 在 `fileStorageService.save()` **之前**：反过来的话省名不合法会抛异常，而那张图已经落在 `uploads/` 里了，没有任何记录指着它，成了永远清不掉的孤儿。
+- **传空串只是清掉那个字段，不是删键**；两个字段都空了，这个键才从表里整个消失。所以「清空介绍」不会顺手把这个省的背景图一起弄没。
+- **`get()` 返回的是深拷贝**。值是 `ProvinceProfile` 这种可变对象，直接把内存里那份交出去，调用方理论上能改到当前表的状态（`Map<String,String>` 那会儿没这个问题，值是不可变的字符串）。
+- **`load()` 走 `JsonNode` 逐条读，不直接映射成 `Map<String, ProvinceProfile>`**：手改坏的文件里出现 `{"四川省": null}` 或者值不是对象的形态时，直接映射要么抛异常让后端起不来，要么塞一个字段全是 `null` 的对象进内存。现在读不出字符串就当空串，两个字段都空的整条丢掉。
 
 **后台上传**（`js/admin.js`）：`FormData` 组装 `title/desc/provinces/before/after` 直接 POST；省份是一排 chip 按钮（`aria-pressed` 就是选中态，不再单独存一个类），清单来自本地常量 `provinces.js`、在 `bindEvents()` 阶段渲染一次，**不能跟着 `init()` 走** —— 接口一失败点「重试」就会把用户已经勾好的省份清掉。描述框的 `maxlength` 与 `DESC_MAX` 都是 50，右边挂一个字数计数器（后端 `WorkService` 里还有一道校验防绕过）；选完文件用 `URL.createObjectURL` 本地预览（换文件时 `revokeObjectURL` 释放）；删除走 confirm + `DELETE`。
 
 > 这里有个 `formEl.reset()` 的坑：chip 不是表单控件（没有 `name`，也不是 `input`/`select`/`textarea`），`reset()` 会**静默跳过**它。提交成功后不手动把每个 chip 的 `aria-pressed` 置回 `false` 的话，下一次上传会悄悄沿用上一次勾的省份。同理 chip 必须写 `type="button"`，否则在 `<form>` 里点一下就触发提交。
 
-**省份介绍**（同一个 `js/admin.js`，`admin.html` 里第三块面板）：一个省份下拉 + 一个 textarea + 保存按钮。下拉的选项和那排 chip 一样来自本地常量 `provinces.js`、在 `bindEvents()` 里渲染一次（理由同上）；介绍是**单独一条 GET、自己带 catch**，失败只让这块面板自己说明情况，不连累作品列表。切换省份时如果当前内容没保存，会 `confirm` 拦一下 —— 页面别处也是这么问的，不做第二套弹窗。`maxlength` 与 `NOTE_MAX`（200）一致，后端 `ProvinceNoteService` 里还有一道校验防绕过。
+**省份设置**（同一个 `js/admin.js`，`admin.html` 里第三块面板）：一个省份下拉 + 背景图预览/选择/上传/恢复默认 + 一个 textarea + 保存按钮。下拉的选项和那排 chip 一样来自本地常量 `provinces.js`、在 `bindEvents()` 里渲染一次（理由同上）；整张表是**单独一条 GET、自己带 catch**，失败只让这块面板自己说明情况，不连累作品列表。切换省份时如果当前内容没保存 —— 介绍改过、**或者只是选了图还没上传** —— 会 `confirm` 拦一下（页面别处也是这么问的，不做第二套弹窗），切过去会清掉选中的文件，不拦就传错省了。`maxlength` 与 `NOTE_MAX`（200）一致，后端 `ProvinceProfileService` 里还有一道校验防绕过。
+
+> 两个接口返回的都是这个省保存后的**完整记录**，所以本地那张表直接拿返回值覆盖就行（`setProfile()`），不用自己拼「哪个字段该留、哪个该清」；两个字段都空时把它从本地表里删掉，和后端的规则对齐。
+>
+> 预览框没传图时显示的是**一句说明**而不是破图，所以没复用 `showPreview()` 那个「未选择」的默认话术，给它加了个 `emptyText` 参数。另外渲染服务器那张图要在清 input **之前** —— 清的时候会 `revokeObjectURL`，预览里还挂着那个地址就是个破图。
 
 **首页封面**（同一个 `js/admin.js`）：`POST /api/site-config/cover` 传单张图，`DELETE` 恢复内置那张。这块面板是**写死在 `admin.html` 里**的（不像作品列表每次增删都整体重建），所以它的监听跟着其它静态元素一起只在 `bindEvents()` 里绑一次；拉配置是**单独一条请求、自己带 catch**，不并进作品列表那个 `Promise.all` —— 那个一旦失败就整页渲染「加载失败」，封面接口偶发失败不该连累列表。预览显示的是「当前生效的那张」，没传过自定义封面就是内置的 `/cover.jpg`。
 
@@ -218,7 +244,7 @@ server {
 - 站点配置 → `backend/data/site.json`（同上；首屏封面 URL + 一段文字 + 字体 id）
 - 首屏封面图不吃单独的存储，就是 `uploads/` 里的普通一张图，`site.json` 只记它的 URL；换封面时旧文件会被删掉，恢复默认也会删
 
-两个目录都在 `.gitignore` 里。作品的省份就存在 `works.json` 每条的 `provinces` 数组里（省级全称，一件作品可以有多个省）；省份介绍在 `data/province-notes.json`（`app.province-note-file` 可配）；字体预设写死在 `SiteConfigService#init`，要接数据库只改 Service，Controller 不动。
+两个目录都在 `.gitignore` 里。作品的省份就存在 `works.json` 每条的 `provinces` 数组里（省级全称，一件作品可以有多个省）；省份背景图和介绍在 `data/province-profiles.json`（`app.province-profile-file` 可配，**文件不存在就一直不存在**，第一次保存才生成）；字体预设写死在 `SiteConfigService#init`，要接数据库只改 Service，Controller 不动。
 
 ## 需要注意
 
@@ -232,7 +258,9 @@ server {
 - **作品图的宽高没有存进 `works.json`**，前台列表只能先按 4:3 猜、等图加载完再按真实比例校正（`createWork` 的 `reveal()` 里改 `aspect-ratio`），所以图片偏高或偏宽时，滚动中会看到一次轻微位移。要根治就让后端在上传时把宽高一起存下来（`ImageIO.read()` 就能读），前端把 `ratio` 换成真实值就行。
 - **「分类」这个概念整个删掉了**（`Category` / `CategoryService` / `CategoryController` / `GET /api/category` / 后台那个下拉 / 页脚那行）。取而代之的是 `Work.provinces`，按省份浏览。改动前 `works.json` 里已有的作品都没有省份，**一律变成「未归类」**，要后台逐个补选；`categoryId` 和它原本指的分类之间没有可换算的关系，所以没写迁移脚本，下次落盘 `persist()` 就会把 `categoryId` 永久抹掉 —— 这是有意的，不是 bug。
 - **`provinces` 存的是省名全称，和 `frontend/public/china.json` 里 feature 的 `properties.name` 必须一字不差**。换了地图数据就要同步重抽 `frontend/js/provinces.js`（那是给后台 chip 列表用的，地图本身是从 GeoJSON 现取的，不引这个文件）。后端不做白名单校验，拼错的省名不会报错，只会让作品掉进「未归类」。
-- **省份介绍是单独一份文件，不是 `SiteConfig` 的字段**（`data/province-notes.json`，一个省一个键）。所以它**不受**上面那条「加字段要同时改三处」的约束；反过来说，往里加东西也别指望 `SiteConfig` 那套 `normalize` 会兜住它 —— 它自己在 `load()` 里滤掉 `null`、空键和空值。介绍清空 = 删键，不是存一个空串。
+- **省份设置是单独一份文件，不是 `SiteConfig` 的字段**（`data/province-profiles.json`，一个省一个键）。所以它**不受**上面那条「加字段要同时改三处」的约束；反过来说，往里加东西也别指望 `SiteConfig` 那套 `normalize` 会兜住它 —— 它自己在 `load()` 里逐条判类型、滤掉空键和空记录。**两个字段都空 = 删键**，不是存一条空记录。
+- **详情页的 Hero 背景图是后台按省传的，不再自动取该省最新作品的成片**。传一件新作品不会把省的脸换掉。没传过的省就是没有 `<img>` 的 `src`（`map.js` 里用 `removeAttribute('src')`，不能赋空串 —— 那在某些浏览器里会被当成「相对当前页」，白白发一次请求回来一个 HTML），`.detail__hero` 那层深色渐变露出来，这是**有意的兜底**，不是缺省态。`alt` 一律留空：那张图是纯装饰，上面压着遮罩和整个标题块，读屏念一遍文件名只会添乱。
+- **地图页的省份设置只在打开时拉一次**，另外挂了个 `visibilitychange`：标签重新可见时静默重拉一遍（去后台改完切回来就能看到），失败什么都不说。它**不能复用 `init()`** —— 那里面要重新 `registerMap`，ECharts 会报重复注册。已经打开着的详情面板不跟着变（内容在用户眼皮底下换掉太跳），返回再点开就是新的。
 - **站点设置只剩封面在用**。前台艺术字那套（表单、`js/fonts.js`、`css/style.css` 的 `--font-art`）已经拆掉，`PUT /api/site-config` 和 `/api/fonts` 现在没有前端消费方，首页只 `GET /api/site-config` 取 `coverUrl`。**这几个类现在不能顺手删了** —— 首屏封面就挂在 `SiteConfig` 上。真要清理，只能删 `FontPreset` / `/api/fonts` / `update()` 那条链，同时把 `SiteConfig` 的 `introText`、`fontId` 一起摘掉。
 - **`PUT /api/site-config` 改的是文字和字体，不碰封面**。后端 `update()` 是拿 `copyOf(current)` 起手再覆盖 `introText`/`fontId`，而不是从零 `new` —— 否则每存一次文字就会把 `coverUrl` 抹成 null。以后往 `SiteConfig` 加字段，记得同时改 `copyOf()` / `normalize()` / `update()` 这三处，漏一处就会丢配置。
 - 依赖参数名反射的写法（`@RequestParam` 不写名字）在 IDEA 直接编译时会失效，因为 IDEA 默认不加 `-parameters`。本项目所有 `@RequestParam`/`@PathVariable` 都写了显式名字，别改回去。

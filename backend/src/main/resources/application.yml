@@ -18,8 +18,8 @@ app:
   data-file: ./data/works.json
   # 站点配置（首屏封面 + 文字 + 字体）JSON 文件
   site-config-file: ./data/site.json
-  # 省份介绍 JSON 文件（省名 -> 一段文字）
-  province-note-file: ./data/province-notes.json
+  # 省份设置 JSON 文件（省名 -> {介绍, 背景图}）
+  province-profile-file: ./data/province-profiles.json
 
 logging:
   level:

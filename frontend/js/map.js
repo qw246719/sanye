@@ -2,7 +2,7 @@
    作品地图页
 
    - 画一张中国地图：没作品的省只有描边，有作品的省泛一点绿光
-   - 点省份 -> 铺满整屏的省份详情（Hero 成片 + 介绍 + 统计 + 照片墙）。
+   - 点省份 -> 右侧半屏的省份详情（Hero 背景图 + 介绍 + 统计 + 照片墙）。
      是覆盖层不是新页面，地图的缩放平移状态留在下面，返回就是关掉
    - 点照片 -> 灯箱看大图（外观和摆位跟首页共用，但没有 FLIP 飞行、
      也没有左右切换 —— 地图页就一张）
@@ -11,7 +11,7 @@
    数据三条线，各失败各的：
    /china.json 拿不到就没得画，整页给错误态；
    /api/works 拿不到只是没有泛光的省，地图照画（退回内置演示图）；
-   /api/province-notes 拿不到只是详情里少一段介绍，别的都在。
+   /api/province-profiles 拿不到只是详情里少一段介绍、Hero 走底色渐变，别的都在。
    ============================================================ */
 
 import * as echarts from 'echarts/core';
@@ -19,7 +19,7 @@ import { MapChart } from 'echarts/charts';
 import { TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
-import { fetchWorks, fetchProvinceNotes, assetUrl, escapeHtml, toast } from './api.js';
+import { fetchWorks, fetchProvinceProfiles, assetUrl, escapeHtml, toast } from './api.js';
 import { DEMO_WORKS } from './demo-works.js';
 import { fitBox, placeImage, placeCaption } from './lightbox.js';
 
@@ -69,8 +69,8 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const byProvince = new Map();
 /** provinces 一个都没匹配上、以及省名为空的作品 */
 const uncategorized = [];
-/** 省名 -> 介绍。后台可改；没写过的省不在表里 */
-let notes = {};
+/** 省名 -> { note, cover }。后台可改；没设置过的省不在表里 */
+let profiles = {};
 
 /** 详情此刻展示的那批，照片按 data-i 回查 */
 let detailWorks = [];
@@ -106,16 +106,16 @@ async function init() {
 
     /* 两趟请求并发，各成功各的、各失败各的。串起来 await 的话，
        作品那趟慢一点就白白多等一个往返，而这两份数据互不依赖 */
-    const [worksRes, notesRes] = await Promise.allSettled([fetchWorks(), fetchProvinceNotes()]);
+    const [worksRes, profilesRes] = await Promise.allSettled([fetchWorks(), fetchProvinceProfiles()]);
 
     // 作品拿不到不该拖垮整页：地图照画，只是没有一个省亮
     const works = worksRes.status === 'fulfilled' ? worksRes.value : null;
     if (worksRes.status === 'rejected') {
         toast('连不上后端，先用内置演示图', 'err');
     }
-    /* 介绍只影响详情里那一段文字，拿不到就不显示（intro 是空的，
-       CSS 那条 :empty 会把它收掉），绝不该把这个页面拖成错误态 */
-    notes = notesRes.status === 'fulfilled' && notesRes.value ? notesRes.value : {};
+    /* 省份设置只影响详情里那段文字和 Hero 的背景图，拿不到就都不显示
+       （intro 是空的，CSS 那条 :empty 会把它收掉），绝不该把这个页面拖成错误态 */
+    profiles = profilesRes.status === 'fulfilled' && profilesRes.value ? profilesRes.value : {};
 
     const real = (works || []).map(w => ({
         id: w.id,
@@ -136,6 +136,27 @@ async function init() {
     chart.setOption({ series: [{ data: seriesData() }] });
     renderEntries();
 }
+
+/* 省份设置是起手拉一次的。去后台改完介绍/背景图再切回这个标签，
+   页面上还是旧的那份 —— 监听可见性，切回来就静默重拉一次。
+   失败什么都不说：这是顺手刷新，不该为它弹一条红提示。
+   （不能复用 init()：那里面会重新 registerMap，ECharts 会报重复注册） */
+async function refreshProfiles() {
+    try {
+        const next = await fetchProvinceProfiles();
+        profiles = next || {};
+    } catch (e) {
+        /* 静默：地图页本来就不靠这份数据活着 */
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    /* 只认「变成可见」。切走那一刻也发一次事件，那次拉回来没人看得到，
+       而且很快就又切回来了 */
+    if (!document.hidden) {
+        refreshProfiles();
+    }
+});
 
 /**
  * 把作品摊到省份上。
@@ -306,27 +327,32 @@ let detailFocus = null;
  */
 function openDetail(title, works, sourceEl) {
     /* 后端回来的顺序是「新的在前」，演示图是数组顺序。这里统一按时间再排一次，
-       Hero 那张和照片墙都得是最新的一张在最前面 */
+       照片墙得是最新的一张在最前面 */
     detailWorks = works.slice().sort((a, b) => (b.time || 0) - (a.time || 0));
 
     const times = detailWorks.map(w => w.time).filter(Boolean);
     const first = times.length ? Math.min(...times) : 0;
     const last = times.length ? Math.max(...times) : 0;
 
+    const profile = profiles[title] || {};
+
     els.detailName.textContent = title;
     els.detailPill.textContent = `${detailWorks.length} 组作品`;
     els.detailDate.textContent = dateSpan(first, last);
-    els.detailIntro.textContent = notes[title] || '';
+    els.detailIntro.textContent = profile.note || '';
 
-    /* 没作品可放就整个属性摘掉。赋空串在某些浏览器里会被当成「相对当前页」，
-       白白发一次请求回来一个 HTML */
-    if (detailWorks.length) {
-        els.detailImg.src = detailWorks[0].url;
-        els.detailImg.alt = detailWorks[0].title;
+    /* Hero 的背景图是后台按省传的，**不是**该省最新作品的成片 ——
+       传一件新作品不该悄悄把省的脸换掉。没传过就整个属性摘掉，
+       .detail__hero 那层深色渐变露出来（赋空串在某些浏览器里会被当成
+       「相对当前页」，白白发一次请求回来一个 HTML）。
+       alt 一律留空：它是纯装饰，上面压着遮罩和整个标题块，
+       读屏念一遍文件名只会添乱 */
+    if (profile.cover) {
+        els.detailImg.src = assetUrl(profile.cover);
     } else {
         els.detailImg.removeAttribute('src');
-        els.detailImg.alt = '';
     }
+    els.detailImg.alt = '';
 
     els.detailStats.innerHTML = statHtml(detailWorks.length, first, last);
     els.detailUpdated.textContent = last ? `已更新 ${ymd(last)}` : '';

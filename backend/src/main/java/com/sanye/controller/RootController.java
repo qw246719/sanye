@@ -27,7 +27,8 @@ public class RootController {
         info.put("siteConfig", "GET  /api/site-config  /  PUT /api/site-config  (json: introText, fontId)");
         info.put("cover", "POST /api/site-config/cover  (multipart: file)  /  DELETE /api/site-config/cover");
         info.put("fonts", "GET  /api/fonts  (首屏艺术字体预设，后台下拉用)");
-        info.put("provinceNotes", "GET  /api/province-notes  /  PUT /api/province-note  (json: province, note)");
+        info.put("provinceProfiles", "GET  /api/province-profiles  /  PUT /api/province-profile  (json: province, note)");
+        info.put("provinceCover", "POST /api/province-cover  (multipart: province, file)  /  DELETE /api/province-cover?province=…");
         return Result.ok(info);
     }
 }

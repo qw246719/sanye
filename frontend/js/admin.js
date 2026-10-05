@@ -4,12 +4,14 @@
    - 列表渲染：GET /api/works
    - 删除：DELETE /api/work/{id}
    - 首页封面：GET /api/site-config、POST/DELETE /api/site-config/cover
+   - 省份设置：GET /api/province-profiles、PUT /api/province-profile、
+     POST/DELETE /api/province-cover（一个省的背景图 + 介绍，两块各自提交）
    ============================================================ */
 
 import {
     fetchSiteConfig, fetchWorks, uploadWork, removeWork,
     uploadCover, clearCover,
-    fetchProvinceNotes, saveProvinceNote,
+    fetchProvinceProfiles, saveProvinceNote, uploadProvinceCover, clearProvinceCover,
     toast, escapeHtml, formatTime, assetUrl, DESC_MAX, NOTE_MAX
 } from './api.js';
 import { PROVINCES } from './provinces.js';
@@ -31,17 +33,25 @@ const coverFileEl = document.getElementById('coverFile');
 const coverPreviewEl = document.getElementById('coverPreview');
 const coverSubmitBtn = document.getElementById('coverSubmit');
 const coverResetBtn = document.getElementById('coverReset');
-const noteProvinceEl = document.getElementById('noteProvince');
+const profileProvinceEl = document.getElementById('profileProvince');
 const noteTextEl = document.getElementById('noteText');
 const noteCountEl = document.getElementById('noteCount');
 const noteSubmitBtn = document.getElementById('noteSubmit');
 const noteStateEl = document.getElementById('noteState');
+const provinceCoverFileEl = document.getElementById('provinceCoverFile');
+const provinceCoverPreviewEl = document.getElementById('provinceCoverPreview');
+const provinceCoverSubmitBtn = document.getElementById('provinceCoverSubmit');
+const provinceCoverResetBtn = document.getElementById('provinceCoverReset');
+const provinceCoverStateEl = document.getElementById('provinceCoverState');
+
+/** 省份设置面板里预览框空着时显示的话。和 renderProvinceCover 里那句保持一致 */
+const PROVINCE_COVER_EMPTY = '没传背景图，地图页走深色渐变';
 
 let works = [];
 /** 当前的封面地址，空串 = 用的内置 /cover.jpg */
 let coverUrl = '';
-/** 省名 -> 介绍。保存成功后就地更新，不用重新拉一遍 */
-let notes = {};
+/** 省名 -> { note, cover }。保存成功后就地更新，不用重新拉一遍 */
+let profiles = {};
 /** 预览图的 objectURL，选择新文件时释放旧的，避免内存泄漏 */
 let previewUrls = {};
 
@@ -54,7 +64,7 @@ async function init() {
     updateDescCount();
     // 这两块各自带 catch，谁失败也只影响自己那块面板
     loadCover();
-    loadNotes();
+    loadProfiles();
     try {
         setWorks((await fetchWorks()) || []);
     } catch (err) {
@@ -115,10 +125,14 @@ function bindEvents() {
     coverSubmitBtn.addEventListener('click', onCoverSubmit);
     coverResetBtn.addEventListener('click', onCoverReset);
 
-    // 省份介绍同理：下拉的选项是本地常量，绑一次就够
-    noteProvinceEl.addEventListener('change', onNoteProvinceChange);
+    // 省份设置同理：下拉的选项是本地常量，绑一次就够
+    profileProvinceEl.addEventListener('change', onProfileProvinceChange);
     noteTextEl.addEventListener('input', updateNoteCount);
     noteSubmitBtn.addEventListener('click', onNoteSubmit);
+    provinceCoverFileEl.addEventListener('change',
+        () => showPreview(provinceCoverFileEl, provinceCoverPreviewEl, 'provinceCover', PROVINCE_COVER_EMPTY));
+    provinceCoverSubmitBtn.addEventListener('click', onProvinceCoverSubmit);
+    provinceCoverResetBtn.addEventListener('click', onProvinceCoverReset);
     renderProvinceOptions();
     updateNoteCount();
 }
@@ -130,15 +144,20 @@ function updateDescCount() {
     descCountEl.classList.toggle('is-full', n >= DESC_MAX);
 }
 
-/** 选中文件后立刻本地预览 */
-function showPreview(input, box, key) {
+/**
+ * 选中文件后立刻本地预览。
+ *
+ * emptyText 是「一个文件都没选」时框里那行字。默认「未选择」是给上传表单那两格用的；
+ * 省份背景图那格要说明白「没图会怎样」，所以由调用方传一句自己的话进来。
+ */
+function showPreview(input, box, key, emptyText = '未选择') {
     const file = input.files && input.files[0];
     if (previewUrls[key]) {
         URL.revokeObjectURL(previewUrls[key]);
         delete previewUrls[key];
     }
     if (!file) {
-        box.textContent = '未选择';
+        box.textContent = emptyText;
         return;
     }
     const url = URL.createObjectURL(file);
@@ -286,56 +305,159 @@ function resetCoverInput() {
     }
 }
 
-/* ---------------- 省份介绍 ---------------- */
+/* ---------------- 省份设置 ---------------- */
 
 /*
- * 介绍是「省名 -> 一段文字」的一张表，后台一次只编辑一个省。
+ * 「省名 -> {介绍, 背景图}」的一张表，后台一次只编辑一个省。
  * 省份本身改不了：它跟着 public/china.json 里的 feature 名走，
- * 这里能做的只是给某个省配一段文字。
+ * 这里能做的只是给某个省配这两样。
+ *
+ * 两块内容各自提交、各走各的接口 —— 保存介绍不会碰到背景图，换背景图也不会碰到介绍。
+ * 两个接口返回的都是这个省保存后的完整记录，所以本地这份表直接拿返回值覆盖就行，
+ * 不用自己拼「哪个字段该留、哪个该清」。
  */
 
 /** 正在编辑哪个省。用来判断切走的时候有没有没存的改动 */
 let editingProvince = '';
 
 /* 下拉的选项和上面那排 chip 一样是本地常量，不依赖接口 ——
-   跟着 loadNotes() 走的话，介绍接口一失败，这个下拉就是空的 */
+   跟着 loadProfiles() 走的话，这个接口一失败，这个下拉就是空的 */
 function renderProvinceOptions() {
-    noteProvinceEl.innerHTML = PROVINCES
+    profileProvinceEl.innerHTML = PROVINCES
         .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
         .join('');
 }
 
-/* 单独一趟、单独 catch：介绍拿不到只让这块面板自己说明情况，
+/* 单独一趟、单独 catch：省份设置拿不到只让这块面板自己说明情况，
    没理由连累作品列表 */
-function loadNotes() {
-    fetchProvinceNotes()
+function loadProfiles() {
+    fetchProvinceProfiles()
         .then(table => {
-            notes = table || {};
-            loadNoteFor(noteProvinceEl.value);
+            profiles = table || {};
+            loadProfileFor(profileProvinceEl.value);
         })
         .catch(err => {
             noteStateEl.textContent = `读取失败：${err.message}`;
         });
 }
 
-/** 换省就是换一份介绍。没写过的省是空的，不给任何默认文案 */
-function loadNoteFor(province) {
+/** 用服务器返回的记录覆盖本地这一条。两个字段都空 = 后端把这个键删了，本地跟着删 */
+function setProfile(province, profile) {
+    const note = (profile && profile.note) || '';
+    const cover = (profile && profile.cover) || '';
+    if (!note && !cover) {
+        delete profiles[province];
+    } else {
+        profiles[province] = { note, cover };
+    }
+}
+
+/** 换省就是换一份设置。没设置过的省两样都是空的，不给任何默认文案 */
+function loadProfileFor(province) {
     editingProvince = province;
-    noteTextEl.value = notes[province] || '';
+    const profile = profiles[province] || {};
+    noteTextEl.value = profile.note || '';
+    /* 先渲染服务器那张再清 input：清的时候会 revoke 掉上一张的 objectURL，
+       预览里要是还挂着它就是个破图。上一个省「选了图还没传」的那张也得清掉，
+       否则会不小心传到这个省头上 */
+    renderProvinceCover(profile.cover || '');
+    resetProvinceCoverInput();
     noteStateEl.textContent = '';
+    provinceCoverStateEl.textContent = '';
     updateNoteCount();
 }
 
-function onNoteProvinceChange() {
-    const next = noteProvinceEl.value;
+function onProfileProvinceChange() {
+    const next = profileProvinceEl.value;
     /* 切走会把没保存的改动丢掉，拦一下。和删除一样用 confirm ——
-       这一页别处也是这么问的，不做一套自己的弹窗 */
-    const dirty = noteTextEl.value.trim() !== (notes[editingProvince] || '');
-    if (dirty && !confirm('这个省的介绍还没保存，切换过去就丢了。继续吗？')) {
-        noteProvinceEl.value = editingProvince;
+       这一页别处也是这么问的，不做一套自己的弹窗。
+       光是选了图还没点上传也算改动：那个文件同样会被 switch 清掉 */
+    const dirty = noteTextEl.value.trim() !== (((profiles[editingProvince] || {}).note) || '')
+        || !!(provinceCoverFileEl.files && provinceCoverFileEl.files[0]);
+    if (dirty && !confirm('这个省的设置还没保存，切换过去就丢了。继续吗？')) {
+        profileProvinceEl.value = editingProvince;
         return;
     }
-    loadNoteFor(next);
+    loadProfileFor(next);
+}
+
+/* 预览的是「当前生效的那张」。没传过就不是一张图，而是一句说明 ——
+   map.js 那边这种省走的是 .detail__hero 的深色渐变，不自动兜一张最新作品上去 */
+function renderProvinceCover(url) {
+    const hasCover = !!url;
+    provinceCoverPreviewEl.innerHTML = hasCover
+        ? `<img src="${escapeHtml(assetUrl(url))}" alt="背景图预览" decoding="async">`
+        : PROVINCE_COVER_EMPTY;
+    provinceCoverResetBtn.hidden = !hasCover;
+}
+
+async function onProvinceCoverSubmit() {
+    const province = profileProvinceEl.value;
+    if (!province) {
+        return;
+    }
+    const file = provinceCoverFileEl.files && provinceCoverFileEl.files[0];
+    if (!file) {
+        toast('请先选一张图片', 'err');
+        provinceCoverFileEl.focus();
+        return;
+    }
+    // 和后端 multipart 的上限对齐，先在本地拦一道，省一次往返
+    if (file.size > 10 * 1024 * 1024) {
+        toast('单张图片不能超过 10MB', 'err');
+        return;
+    }
+
+    provinceCoverSubmitBtn.disabled = true;
+    provinceCoverSubmitBtn.textContent = '上传中…';
+    try {
+        const saved = await uploadProvinceCover(province, file);
+        setProfile(province, saved);
+        // 先渲染服务器返回的地址再清 input：清的时候会 revoke 掉本地那张的 objectURL。
+        // input 也必须清，否则改完再点一次会把同一张重复传一遍
+        renderProvinceCover((saved && saved.cover) || '');
+        resetProvinceCoverInput();
+        provinceCoverStateEl.textContent = '已保存';
+        toast('背景图已更新', 'ok');
+    } catch (err) {
+        toast(err.message, 'err');
+    } finally {
+        provinceCoverSubmitBtn.disabled = false;
+        provinceCoverSubmitBtn.textContent = '上传背景图';
+    }
+}
+
+async function onProvinceCoverReset() {
+    const province = profileProvinceEl.value;
+    if (!province) {
+        return;
+    }
+    if (!confirm(`确定清掉「${province}」的背景图吗？那张图会被一并删除，不可恢复。介绍不受影响。`)) {
+        return;
+    }
+
+    provinceCoverResetBtn.disabled = true;
+    try {
+        const saved = await clearProvinceCover(province);
+        setProfile(province, saved);
+        renderProvinceCover((saved && saved.cover) || '');
+        resetProvinceCoverInput();
+        provinceCoverStateEl.textContent = '已恢复默认';
+        toast('已恢复成底色渐变', 'ok');
+    } catch (err) {
+        toast(err.message, 'err');
+    } finally {
+        provinceCoverResetBtn.disabled = false;
+    }
+}
+
+/* 清掉 input 里选过的文件。此时预览已经换成服务器返回的地址，本地那个 objectURL 可以释放了 */
+function resetProvinceCoverInput() {
+    provinceCoverFileEl.value = '';
+    if (previewUrls.provinceCover) {
+        URL.revokeObjectURL(previewUrls.provinceCover);
+        delete previewUrls.provinceCover;
+    }
 }
 
 function updateNoteCount() {
@@ -346,7 +468,7 @@ function updateNoteCount() {
 }
 
 async function onNoteSubmit() {
-    const province = noteProvinceEl.value;
+    const province = profileProvinceEl.value;
     if (!province) {
         return;
     }
@@ -355,15 +477,11 @@ async function onNoteSubmit() {
     noteSubmitBtn.disabled = true;
     noteSubmitBtn.textContent = '保存中…';
     try {
-        await saveProvinceNote(province, note);
+        const saved = await saveProvinceNote(province, note);
+        setProfile(province, saved);
         /* 存进去的是 trim 过的，回写一份，免得本地留着的和服务器上的差一个空格，
            下次切回来又变成「有改动」 */
-        noteTextEl.value = note;
-        if (note) {
-            notes[province] = note;
-        } else {
-            delete notes[province];
-        }
+        noteTextEl.value = (saved && saved.note) || '';
         updateNoteCount();
         noteStateEl.textContent = note ? '已保存' : '已清空';
         toast(note ? '介绍已保存' : '介绍已清空', 'ok');
