@@ -182,6 +182,12 @@ body {
        窄屏在下面的媒体查询里整个覆盖成 100vw —— 手机上右半边没法定居 */
     --detail-w: clamp(460px, 60vw, 940px);
 
+    /* 「贴边」那条线：Hero 里的年份/省名/介绍，以及正文最上面那行统计，
+       都站这条线。定义在面板这一层而不是 .detail__head 上 —— 统计那行不在
+       Hero 里面，得从这儿继承下去。它恒 ≤ --pad（两个 clamp 的下限都是
+       20px，而 5vw 永远大于 1.8vw），所以 .detail__stats 拿它做负偏移是安全的 */
+    --head-pad: clamp(20px, 1.8vw, 30px);
+
     position: fixed;
     top: 0;
     right: 0;
@@ -307,13 +313,9 @@ body {
    auto 外边距会把整块居中，在 --pad 之外又叠一层内缩，
    文字就不在左缘那条线上了。
 
-   这里**故意不跟正文共用 --pad**：Hero 是铺满整块面板的图，省名和介绍
-   站在它自己的左缘，比下面那列正文更贴边（1440 屏上 26px vs 72px）。
-   正文（.detail__body 里的统计/区块标题/照片墙）仍然走 --pad，
-   两边错开是有意的，别看到数值不一样就"顺手统一"。 */
+   左缘走 --head-pad（定义在 .detail 上，下面那行统计用同一条线），
+   比正文的 --pad 更贴边：1440 屏上 26px vs 72px。 */
 .detail__head {
-    --head-pad: clamp(20px, 1.8vw, 30px);
-
     position: absolute;
     left: 0;
     right: 0;
@@ -358,15 +360,18 @@ body {
    正文：统计 / 区块标题 / 照片墙
    ------------------------------------------------------------ */
 
-/* 同样不居中：标题块、统计、区块标题、照片墙一律贴面板左边距，
-   跟返回按钮一条竖线 */
+/* 同样不居中。这里给的是正文那条 --pad：
+   区块标题和照片墙贴它，跟左上角的返回按钮一条竖线 */
 .detail__body {
     padding: 0 var(--pad) 80px;
 }
 
+/* 只有统计这行要跟省名对齐，所以从正文那条线往左挪回 --head-pad 去。
+   偏移在窄屏会自然收敛到 0（两边都 clamp 到 20px），不用另外写媒体查询 */
 .detail__stats {
     display: flex;
     margin: 30px 0 0;
+    margin-left: calc(var(--head-pad) - var(--pad));
 }
 
 .detail__stats > div {
