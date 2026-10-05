@@ -326,10 +326,35 @@
     display: none;
 }
 
-/* 管理列表 */
+/* 管理列表。作品是只增不减的，不封顶的话这一列会一路长下去，
+   把整组（连同下面的「站点设置」）往下顶 —— 左边那张上传表单高度是固定的，
+   于是「作品」这一组的高度完全由作品数量决定。
+   所以给它一个固定的方框，多出来的在框里自己滚。
+
+   高度取的是左边那张表单的高度：两边底边齐，这一组的高度也就跟作品数量
+   彻底脱钩了，加多少张都不再往下长 */
 .admin-list {
     display: grid;
     gap: 12px;
+    max-height: 900px;
+    overflow-y: auto;
+    /* 滚到头不要顺手把整页也带着滚 */
+    overscroll-behavior: contain;
+}
+
+/* 页面没写 color-scheme，深色底上浏览器给的是浅色滚动条，很扎眼。
+   只给这个框单独调，不动整页的 */
+.admin-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.admin-list::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+}
+
+.admin-list::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
 }
 
 .admin-item {
@@ -397,6 +422,7 @@
     gap: 10px;
     flex-wrap: wrap;
 }
+
 
 @media (max-width: 960px) {
     .admin-grid--main {
