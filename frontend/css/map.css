@@ -298,14 +298,15 @@ body {
     border-radius: 999px;
 }
 
-/* 标题块压在 Hero 下缘 */
+/* 标题块压在 Hero 下缘。
+   **不要 max-width + margin: 0 auto** —— 面板宽 60vw 时它比 760px 宽，
+   auto 外边距会把整块居中，在 --pad 之外又叠一层内缩，
+   标题就跟左上角返回按钮对不齐了。内容一律贴 --pad 靠左 */
 .detail__head {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    max-width: 760px;
-    margin: 0 auto;
     padding: 0 var(--pad) clamp(20px, 3.4vh, 34px);
 }
 
@@ -346,9 +347,9 @@ body {
    正文：统计 / 区块标题 / 照片墙
    ------------------------------------------------------------ */
 
+/* 同样不居中：标题块、统计、区块标题、照片墙一律贴面板左边距，
+   跟返回按钮一条竖线 */
 .detail__body {
-    max-width: 760px;
-    margin: 0 auto;
     padding: 0 var(--pad) 80px;
 }
 
@@ -383,11 +384,13 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* 标题和「已更新」挨着靠左，不再 space-between ——
+   面板最宽 940px，两端对齐会把这行日期甩到 700 多像素外，
+   跟标题断成两块。整块内容一律从左缘读起 */
 .detail__sec {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 14px;
     margin: clamp(34px, 6vh, 52px) 0 16px;
 }
 
