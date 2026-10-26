@@ -24,6 +24,14 @@
     </div>
     <h1 class="tl-head__title">人生足迹时间轴</h1>
     <p class="tl-head__sub">沿着年份，重新走一遍走过的路。</p>
+
+    <!-- 年份跨度 / 城市数 / 旅途天数：和地图页「旅途印记」同一套算法，
+         两页上的数字必须对得上，否则用户会以为是两个数 -->
+    <p class="tl-head__stat" id="tlStat" hidden></p>
+
+    <!-- 年份跳转。条目多起来以后，光靠滚有点累；
+         当前年份跟着滚动高亮（见 js/timeline.js 的 initScrollSpy） -->
+    <nav class="tl-jump" id="tlJump" aria-label="按年份跳转" hidden></nav>
 </header>
 
 <main class="tl-main">
@@ -46,6 +54,7 @@
 <footer class="tl-foot">
     <a href="map.html">作品地图</a>
     <a href="index.html">作品列表</a>
+    <a href="device/index.html">设备介绍</a>
 </footer>
 
 <script type="module" src="/js/timeline.js"></script>

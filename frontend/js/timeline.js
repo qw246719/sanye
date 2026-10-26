@@ -10,7 +10,7 @@
    （见 map.js 的 toWorks 里那段注释）。
    ============================================================ */
 
-import { fetchWorks, escapeHtml } from './api.js';
+import { fetchWorks, assetUrl, escapeHtml } from './api.js';
 
 /**
  * 年份寄语：一年一句，**前端写死的**。
@@ -31,7 +31,12 @@ const els = {
     list: document.getElementById('tlList'),
     hint: document.getElementById('tlHint'),
     state: document.getElementById('tlState'),
+    stat: document.getElementById('tlStat'),
+    jump: document.getElementById('tlJump'),
 };
+
+/* 减少动态效果：跳转用瞬时滚动，不做平滑 */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 init();
 
@@ -51,7 +56,12 @@ async function init() {
         return;
     }
 
-    render(trips);
+    const groups = groupByYear(trips);
+    render(groups);
+    renderStat(trips, groups);
+    renderJump(groups);
+    initScrollSpy();
+    openFromQuery();
     renderHint(list);
 }
 
@@ -61,6 +71,7 @@ async function init() {
  */
 function toTrips(list) {
     return (list || []).map(w => ({
+        id: w.id,
         city: String(w.city == null ? '' : w.city).trim(),
         takenAt: Number(w.takenAt) || 0,
         /* 旅行备注直接复用作品那句描述 —— 地图页「最近的回忆」那几行
@@ -72,6 +83,9 @@ function toTrips(list) {
         province: Array.isArray(w.provinces) && w.provinces.length
             ? String(w.provinces[0]).trim()
             : '',
+        /* 缩略图直接用作品成片。这一页原来只有字，加了这张之后
+           「去过哪儿」和「看过什么」才是同一件事 */
+        url: assetUrl(w.afterUrl) || '',
     })).filter(t => t.city && t.takenAt > 0);
 }
 
@@ -95,28 +109,32 @@ function groupByYear(trips) {
    渲染
    ------------------------------------------------------------ */
 
-function render(trips) {
+function render(groups) {
     /* --i 是**按 DOM 顺序**数的（年份头先，然后才是它下面那几条），
        所以不能分开渲染；一边走一边加 */
     let i = 0;
     const next = () => Math.min(i++, STAGGER_MAX);
 
-    const blocks = groupByYear(trips).map(group => {
+    const blocks = groups.map(group => {
+        /* id / data-year 给年份跳转和「滚到哪一年」的高亮用（见 initScrollSpy） */
         const head = `
-            <li class="tl-year" style="--i:${next()}">
+            <li class="tl-year" id="year-${group.year}" data-year="${group.year}" style="--i:${next()}">
                 <h2 class="tl-year__head">
                     <span class="tl-year__n">${group.year}</span>
                     <span class="tl-year__count">${group.items.length} ${group.items.length > 1 ? 'JOURNEYS' : 'JOURNEY'}</span>
                 </h2>
                 ${YEAR_NOTES[group.year] ? `<p class="tl-year__note">${escapeHtml(YEAR_NOTES[group.year])}</p>` : ''}
+                ${platesHtml(group.items, next)}
             </li>`;
 
         const rows = group.items.map(t => `
             <li class="tl-item">
                 <a class="tl-item__hit" href="${tripHref(t)}" style="--i:${next()}">
-                    <p class="tl-item__city">${escapeHtml(t.city)}</p>
-                    <p class="tl-item__date">${ymd(t.takenAt)}</p>
-                    ${t.note ? `<p class="tl-item__note">${escapeHtml(t.note)}</p>` : ''}
+                    <span class="tl-item__text">
+                        <span class="tl-item__city">${escapeHtml(t.city)}</span>
+                        <span class="tl-item__date">${ymd(t.takenAt)}</span>
+                        ${t.note ? `<span class="tl-item__note">${escapeHtml(t.note)}</span>` : ''}
+                    </span>
                 </a>
             </li>`).join('');
 
@@ -124,6 +142,24 @@ function render(trips) {
     });
 
     els.list.innerHTML = blocks.join('');
+}
+
+/**
+ * 每一年开头的那排照片：这一年的行程各配一张，点一张回到作品辑里的那一件
+ * （首页认 ?work=<id>，见 gallery.js 的 focusFromQuery）。
+ * 照片全都取不到时整排不出现，不占一块空位。
+ */
+function platesHtml(items, next) {
+    const shots = items.filter(t => t.url);
+    if (!shots.length) {
+        return '';
+    }
+    return `<div class="tl-plates" style="--i:${next()}">${shots.map(t => `
+        <a class="tl-plate" href="index.html?work=${encodeURIComponent(t.id)}"
+           title="${escapeHtml(t.city)} · ${ymd(t.takenAt)}">
+            <span class="tl-plate__img"><img src="${escapeHtml(t.url)}" alt="" loading="lazy" decoding="async"></span>
+            <span class="tl-plate__cap">${escapeHtml(t.city)}</span>
+        </a>`).join('')}</div>`;
 }
 
 /**
@@ -135,6 +171,116 @@ function tripHref(trip) {
     return trip.province
         ? `map.html?province=${encodeURIComponent(trip.province)}`
         : 'map.html?uncat=1';
+}
+
+/* ------------------------------------------------------------
+   页头的数字与年份跳转
+   ------------------------------------------------------------ */
+
+/* 年份跨度 · 城市数 · 旅途天数。
+   和地图页「旅途印记」是同一套口径（拍摄日期 max - min + 1），
+   两页的数字必须对得上，不然用户会以为是两个数 */
+function renderStat(trips, groups) {
+    const years = groups.map(g => g.year);
+    const span = years.length > 1
+        ? `${Math.min(...years)} — ${Math.max(...years)}`
+        : String(years[0]);
+    const cities = new Set(trips.map(t => t.city)).size;
+
+    const stamps = trips.map(t => dayOf(t.takenAt));
+    const days = Math.round((Math.max(...stamps) - Math.min(...stamps)) / 86400000) + 1;
+
+    els.stat.innerHTML = `<span>${span}</span>`
+        + '<span class="tl-head__sep" aria-hidden="true">·</span>'
+        + `<span>${cities} 座城市</span>`
+        + '<span class="tl-head__sep" aria-hidden="true">·</span>'
+        + `<span>旅途 ${days} 天</span>`;
+    els.stat.hidden = false;
+}
+
+/** 归到当地零点。直接拿时间戳相减的话，中间隔着夏令时会差出一小时 */
+function dayOf(ts) {
+    const d = new Date(ts);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function renderJump(groups) {
+    /* 只有一年的时候一排 chip 没有意义，直接不出现 */
+    if (groups.length < 2) {
+        return;
+    }
+
+    els.jump.innerHTML = groups.map(g => `
+        <a class="tl-jump__item" href="#year-${g.year}" data-year="${g.year}">
+            ${g.year}<span class="tl-jump__n">${g.items.length}</span>
+        </a>`).join('');
+    els.jump.hidden = false;
+
+    els.jump.addEventListener('click', (e) => {
+        const a = e.target.closest('.tl-jump__item');
+        const target = a && document.getElementById(`year-${a.dataset.year}`);
+        if (!target) {
+            return;
+        }
+        e.preventDefault();
+        target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+        target.classList.add('is-flash');
+        setTimeout(() => target.classList.remove('is-flash'), 1800);
+    });
+}
+
+/* 滚过一条就点亮一段竖线，同时把顶上的年份 chip 换到当前那一年。
+
+   一条条算而不是用 IntersectionObserver：这里要的是「已经滚过去的都亮着」，
+   观察器只知道「此刻在不在视口里」—— 往回跳一年，会留下一段暗的 */
+function initScrollSpy() {
+    const items = [...els.list.children];
+    const years = items.filter(el => el.classList.contains('tl-year'));
+    const chips = [...els.jump.querySelectorAll('.tl-jump__item')];
+    let raf = 0;
+
+    function frame() {
+        raf = 0;
+        const line = innerHeight * .62;
+        items.forEach(li => li.classList.toggle('is-lit', li.getBoundingClientRect().top < line));
+
+        let active = years.length ? years[0].dataset.year : '';
+        years.forEach(y => {
+            if (y.getBoundingClientRect().top < innerHeight * .4) {
+                active = y.dataset.year;
+            }
+        });
+        chips.forEach(c => c.classList.toggle('is-on', c.dataset.year === active));
+    }
+
+    function onScroll() {
+        if (!raf) {
+            raf = requestAnimationFrame(frame);
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    frame();
+}
+
+/* 地图页的省详情会带 ?year= 过来：滚到那一年、闪一下，再把查询串擦掉 ——
+   不擦的话刷新一次又跳一次。认不出来就安静停着，不弹错 */
+function openFromQuery() {
+    const year = new URLSearchParams(location.search).get('year');
+    if (!year) {
+        return;
+    }
+    const target = document.getElementById(`year-${year}`);
+    if (!target) {
+        return;
+    }
+    history.replaceState(null, '', location.pathname);
+    requestAnimationFrame(() => {
+        target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+        target.classList.add('is-flash');
+        setTimeout(() => target.classList.remove('is-flash'), 2000);
+    });
 }
 
 /**

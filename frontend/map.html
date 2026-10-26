@@ -32,6 +32,7 @@
     <!-- 右侧收进一个 wrapper：.map-bar 是 space-between，直接往里塞第二个
          链接会被摆到正中间去（首页 .bar__links 是同样的做法） -->
     <nav class="map-bar__links">
+        <a class="map-bar__back map-bar__device" href="device/index.html">设备介绍</a>
         <a class="map-bar__back" href="timeline.html">人生足迹时间轴</a>
         <a class="map-bar__back" href="index.html">← 作品列表</a>
     </nav>
@@ -128,6 +129,9 @@
             <p class="detail__date" id="detailDate"></p>
             <h2 class="detail__name" id="detailName"></h2>
             <p class="detail__intro" id="detailIntro"></p>
+            <!-- 把地图和时间轴接起来：点到这个省，就去时间轴上那一年。
+                 这个省一件带拍摄日期的作品都没有时 hidden 收掉（算不出年份） -->
+            <a class="detail__timeline" id="detailTimeline" href="timeline.html" hidden>在时间轴上找这一年 →</a>
         </div>
     </div>
 

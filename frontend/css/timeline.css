@@ -126,6 +126,77 @@ body::before {
     color: var(--ink-2);
 }
 
+/* 页头那行数字。和地图页「旅途印记」同一套口径，两页要能对上 */
+.tl-head__stat {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: clamp(16px, 2.6vh, 22px) 0 0;
+    font-size: 12px;
+    letter-spacing: .16em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.tl-head__stat[hidden] {
+    display: none;
+}
+
+.tl-head__sep {
+    color: rgba(242, 240, 236, .2);
+}
+
+/* 年份跳转：条目多起来之后光靠滚太累。
+   当前那一年跟着滚动高亮（js/timeline.js 的 initScrollSpy） */
+.tl-jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.tl-jump[hidden] {
+    display: none;
+}
+
+.tl-jump__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px;
+    font-size: 12px;
+    letter-spacing: .12em;
+    color: var(--ink-2);
+    text-decoration: none;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: rgba(8, 8, 10, .3);
+    font-variant-numeric: tabular-nums;
+    transition: color .25s, border-color .25s, background .25s;
+}
+
+.tl-jump__item:hover {
+    color: var(--ink);
+    border-color: var(--line);
+    background: rgba(255, 255, 255, .05);
+}
+
+.tl-jump__item.is-on {
+    color: var(--accent);
+    border-color: rgba(155, 196, 111, .45);
+    background: rgba(155, 196, 111, .07);
+}
+
+.tl-jump__n {
+    font-size: 10px;
+    color: var(--muted);
+}
+
+.tl-jump__item.is-on .tl-jump__n {
+    color: rgba(155, 196, 111, .72);
+}
+
 /* ------------------------------------------------------------
    时间轴本体
 
@@ -171,6 +242,8 @@ body::before {
     width: 1px;
     margin-left: -.5px;
     background: var(--line-soft);
+    /* 「走过的路」：滚过一段就点亮一段（.is-lit 由 js/timeline.js 挂） */
+    transition: background .45s var(--ease);
 }
 
 /* 第一个圆点上面不出头 */
@@ -201,6 +274,17 @@ body::before {
     transform: translate(-50%, -50%);
     border-radius: 50%;
     background: var(--accent);
+    transition: box-shadow .45s var(--ease);
+}
+
+/* 已经走过的那一段：线亮起来、圆点带一圈光 */
+.tl > li.is-lit::before {
+    background: rgba(155, 196, 111, .5);
+    box-shadow: 0 0 10px rgba(155, 196, 111, .18);
+}
+
+.tl > li.is-lit::after {
+    box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 /* 年份头那个节点比条目大一圈，带一圈很淡的光晕
@@ -213,6 +297,20 @@ body::before {
     /* 对准年份数字的中线：留白 + 字高的一半。
        1.1 是 .tl-year__n 的 line-height，跟着一起改 */
     --tl-dot-top: calc(var(--tl-pad-top) + var(--tl-year-size) * 1.1 / 2);
+
+    /* 从别的页用 ?year= 跳过来 / 点年份 chip 时，别让年份贴死在屏幕顶上 */
+    scroll-margin-top: clamp(20px, 7vh, 56px);
+}
+
+/* 跳过来那一下闪一下年份数字，不然落地了也不知道落在哪 */
+.tl-year.is-flash .tl-year__n {
+    animation: yearFlash 2s var(--ease);
+}
+
+@keyframes yearFlash {
+    0%, 100% { color: inherit; }
+    18%      { color: var(--accent); }
+    62%      { color: var(--accent); }
 }
 
 .tl-year::after {
@@ -296,7 +394,77 @@ body::before {
     border-color: rgba(255, 255, 255, .1);
 }
 
+.tl-item__text {
+    display: block;
+    min-width: 0;
+}
+
+/* ------------------------------------------------------------
+   年份开头那排照片
+
+   每条足迹配一张，点一张回作品辑里对应的那一件。
+   这一页原来从头到尾只有字；这几张是「那年到底长什么样」，
+   也是三页之间最短的一条路：时间轴 → 作品辑。
+   ------------------------------------------------------------ */
+
+.tl-plates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+    animation: riseIn .62s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 55ms + 180ms);
+}
+
+.tl-plate {
+    display: block;
+    width: clamp(96px, 9.5vw, 132px);
+    color: inherit;
+    text-decoration: none;
+}
+
+.tl-plate__img {
+    display: block;
+    aspect-ratio: 4 / 3;
+    border-radius: 9px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, .04);
+    opacity: .82;
+    transition: opacity .3s var(--ease), transform .45s var(--ease);
+}
+
+.tl-plate__img img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 照片底下的城市名。截断而不是换行 —— 一条长城市名不该把整排撑歪 */
+.tl-plate__cap {
+    display: block;
+    margin-top: 7px;
+    font-size: 11px;
+    letter-spacing: .14em;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color .25s;
+}
+
+.tl-plate:hover .tl-plate__img {
+    opacity: 1;
+    transform: translateY(-2px);
+}
+
+.tl-plate:hover .tl-plate__cap {
+    color: var(--ink-2);
+}
+
 .tl-item__city {
+    /* 原来是 <p>，为了给缩略图让位改成了 <span>，这里补回块级 */
+    display: block;
     margin: 0;
     font-size: var(--tl-city-size);
     font-weight: 500;
@@ -306,6 +474,7 @@ body::before {
 }
 
 .tl-item__date {
+    display: block;
     margin: 6px 0 0;
     font-size: 12px;
     letter-spacing: .14em;
@@ -315,6 +484,7 @@ body::before {
 
 /* 旅行备注 = 作品那句描述。空的时候 js 那边整行不渲染 */
 .tl-item__note {
+    display: block;
     margin: 9px 0 0;
     font-size: clamp(13px, 1.05vw, 14.5px);
     line-height: 1.85;
@@ -382,6 +552,34 @@ body::before {
 }
 
 /* ------------------------------------------------------------
+   窄屏
+   ------------------------------------------------------------ */
+
+@media (max-width: 560px) {
+    .tl-plates {
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .tl-plate {
+        width: 84px;
+    }
+
+    .tl-head__stat {
+        gap: 8px;
+    }
+
+    .tl-jump {
+        gap: 6px;
+    }
+
+    .tl-jump__item {
+        padding: 5px 10px;
+        font-size: 11.5px;
+    }
+}
+
+/* ------------------------------------------------------------
    reduced motion
 
    ⚠️ 必须写 animation: none，**不能**只把时长改成 0：
@@ -392,7 +590,13 @@ body::before {
     body::before,
     .tl-year__head,
     .tl-year__note,
+    .tl-plates,
     .tl-item__hit {
+        animation: none;
+    }
+
+    /* 年份闪一下是纯装饰，撤掉；跳转本身还是瞬时的（JS 那边认 reduced） */
+    .tl-year.is-flash .tl-year__n {
         animation: none;
     }
 }

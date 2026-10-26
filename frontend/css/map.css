@@ -233,6 +233,26 @@ body {
     background: var(--accent);
 }
 
+/* 提示框里那张「该省最新的一张」。
+   提示框本身是 HTML（appendToBody），这张图就是详情墙里那张，
+   尺寸写死在这里 —— 图还没解码完时提示框也不会忽大忽小地跳 */
+.map-tip__shot {
+    display: block;
+    width: 158px;
+    height: 96px;
+    margin-top: 9px;
+    border-radius: 7px;
+    overflow: hidden;
+    background: rgba(242, 240, 236, .06);
+}
+
+.map-tip__shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .map-error {
     position: absolute;
     inset: 0;
@@ -972,6 +992,29 @@ body {
     color: var(--ink-2);
 }
 
+/* 「在时间轴上找这一年」：地图 → 时间轴的那条链。
+   没有拍摄日期的省不出现（JS 那边用 hidden 收掉） */
+.detail__timeline {
+    display: inline-block;
+    margin-top: 14px;
+    padding-bottom: 2px;
+    font-size: 12px;
+    letter-spacing: .14em;
+    color: var(--accent-lite);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(183, 221, 138, .42);
+    transition: color .25s, border-color .25s;
+}
+
+.detail__timeline:hover {
+    color: var(--ink);
+    border-color: var(--accent);
+}
+
+.detail__timeline[hidden] {
+    display: none;
+}
+
 /* ------------------------------------------------------------
    正文：统计 / 区块标题 / 照片墙
    ------------------------------------------------------------ */
@@ -1006,6 +1049,7 @@ body {
 .detail__head > *:nth-child(1) { --i: 0; }
 .detail__head > *:nth-child(2) { --i: 1; }
 .detail__head > *:nth-child(3) { --i: 2; }
+.detail__head > *:nth-child(4) { --i: 3; }
 .detail__stats > *:nth-child(1) { --i: 3; }
 .detail__stats > *:nth-child(2) { --i: 4; }
 .detail__stats > *:nth-child(3) { --i: 5; }
@@ -1204,6 +1248,12 @@ body {
         font-size: 11px;
         letter-spacing: .08em;
         padding: 5px 10px;
+    }
+
+    /* 窄屏顶栏放不下第三颗胶囊：设备介绍在首页和页脚都有入口，
+       这里先收掉，别把顶栏挤换行 */
+    .map-bar__device {
+        display: none;
     }
 
     .map-bar__title {

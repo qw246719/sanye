@@ -49,6 +49,7 @@ const els = {
     detailDate: document.getElementById('detailDate'),
     detailName: document.getElementById('detailName'),
     detailIntro: document.getElementById('detailIntro'),
+    detailTimeline: document.getElementById('detailTimeline'),
     detailStats: document.getElementById('detailStats'),
     detailUpdated: document.getElementById('detailUpdated'),
     detailWall: document.getElementById('detailWall'),
@@ -505,7 +506,15 @@ function renderMap(geo) {
                 const dot = list
                     ? `<span class="map-tip__dot" style="background:${PROVINCE_COLORS[p.name] || ACCENT};box-shadow:0 0 8px rgba(${provinceRgb(p.name)}, .75)"></span>`
                     : '';
-                return `${dot}${escapeHtml(p.name)}<br><span class="map-tip__n">${n}</span>`;
+                /* 有作品的省，提示框里顺带露一张该省最新的照片 + 最近日期。
+                   提示框是 HTML 的（appendToBody），塞一张图不额外发请求 ——
+                   这张图本来就属于那个省的详情墙，之后点开直接命中缓存 */
+                const top = list && list.length ? list[0] : null;
+                const when = top && top.time ? ` · 最近 ${ymd(top.time)}` : '';
+                const shot = top
+                    ? `<span class="map-tip__shot"><img src="${escapeHtml(top.url)}" alt="" decoding="async"></span>`
+                    : '';
+                return `${dot}${escapeHtml(p.name)}<br><span class="map-tip__n">${n}${when}</span>${shot}`;
             },
         },
         series: [{
@@ -620,6 +629,19 @@ function openDetail(title, works, sourceEl, fromLink = false) {
     els.detailPill.textContent = `${detailWorks.length} 组作品`;
     els.detailDate.textContent = dateSpan(first, last);
     els.detailIntro.textContent = profile.note || '';
+
+    /* 这个省有时间锚点才给「在时间轴上找这一年」。
+       ⚠️ 用的是 takenAt，不是 detailWorks 里那个 time —— time 在没填拍摄日期时
+       会落回 createTime（上传时间），拿它算出来的年份在时间轴上根本不存在
+       （时间轴只认 city + takenAt），点过去会安静地停在页顶，像坏了一样 */
+    const dated = detailWorks.map(w => Number(w.takenAt) || 0).filter(Boolean);
+    if (dated.length) {
+        els.detailTimeline.hidden = false;
+        els.detailTimeline.href = `timeline.html?year=${new Date(Math.max(...dated)).getFullYear()}`;
+    } else {
+        els.detailTimeline.hidden = true;
+        els.detailTimeline.href = 'timeline.html';
+    }
 
     /* Hero 的背景图是后台按省传的，**不是**该省最新作品的成片 ——
        传一件新作品不该悄悄把省的脸换掉。没传过就整个属性摘掉，
