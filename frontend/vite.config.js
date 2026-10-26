@@ -25,6 +25,7 @@ export default defineConfig({
                 admin: entry('./admin.html'),
                 map: entry('./map.html'),
                 timeline: entry('./timeline.html'),
+                closing: entry('./closing.html'),
             },
         },
     },

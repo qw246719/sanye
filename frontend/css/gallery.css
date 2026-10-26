@@ -231,12 +231,21 @@ a {
    ============================================================ */
 
 .hero__img:not(.hero__img--soft) {
-    animation: heroIn 3s var(--ease) both;
+    /* 进场那一下是 heroIn（transform），之后一直在极慢地呼吸（scale）。
+       两条动画各管一个属性，不抢同一栏；不想要动效的系统设置里两条都撤 */
+    animation: heroIn 3s var(--ease) both, heroDrift 34s ease-in-out 3s infinite;
 }
 
 @keyframes heroIn {
     from { transform: scale(1.08); }
     to   { transform: scale(1); }
+}
+
+/* 停住之后的「呼吸」：幅度只有 3.5%，几秒才走完一个来回。
+   首屏是一张定住的照片时，这 3.5% 就是「这张图还活着」的全部区别 */
+@keyframes heroDrift {
+    0%, 100% { scale: 1; }
+    50%      { scale: 1.035; }
 }
 
 .hero__kicker {
@@ -382,15 +391,21 @@ body.is-past .bar {
     gap: 10px;
 }
 
-/* 首屏时 .bar 还收在屏幕外，没这个按钮就进不去地图。
-   滚过封面（body.is-past）之后 .bar 滑下来，它让位 —— 两个入口不同时出现。
+/* 首屏时 .bar 还收在屏幕外，这两个入口就是首屏唯一能点的地方。
+   滚过封面（body.is-past）之后 .bar 滑下来，它们让位 —— 两组入口不同时出现。
    z-index 夹在 .flow(10) 和 .bar(30) 之间：让位的那 0.35s 里两者都在屏幕上，
    不能让它压住顶栏的链接 */
-.map-fab {
+.hero-nav {
     position: fixed;
     top: calc((var(--bar-h) - 32px) / 2);
     right: var(--pad);
     z-index: 20;
+    display: flex;
+    gap: 8px;
+    transition: opacity .35s var(--ease), transform .35s var(--ease);
+}
+
+.hero-nav__link {
     padding: 6px 14px;
     font-size: 12px;
     letter-spacing: .16em;
@@ -400,18 +415,17 @@ body.is-past .bar {
     backdrop-filter: blur(20px) saturate(1.3);
     border: 1px solid var(--line);
     border-radius: 999px;
-    transition: color .25s, border-color .25s,
-                opacity .35s var(--ease), transform .35s var(--ease);
+    transition: color .25s, border-color .25s;
 }
 
-.map-fab:hover {
+.hero-nav__link:hover {
     color: var(--ink);
     border-color: rgba(242, 240, 236, .34);
 }
 
 /* pointer-events 必须一起收掉：过渡那 0.35s 里它还压在右上角，
    留着会跟顶栏的链接抢点击 */
-body.is-past .map-fab {
+body.is-past .hero-nav {
     opacity: 0;
     transform: translateY(-8px);
     pointer-events: none;
@@ -443,27 +457,85 @@ body.is-past .map-fab {
 }
 
 /* ============================================================
-   作品列表：一左一右交替，照片旁边配一段自己的话
+   作品列表：一册有节奏的影集
+
+   原来是「每件作品都一模一样的一左一右」：图 1.5 份、文 1 份，
+   每行都长得一样，滚起来像一张表格。现在改成三档尺寸轮换 ——
+   每 4 件的第一件是通栏大图（.work--plate），其余两件左右对调。
+   说明文字从「图旁边居中漂着」改成「顶到照片上沿、压到照片下沿」：
+   小序号在最上面，标题和描述在最下面，一条竖线把这一栏串起来。
+   中间那段留白就成了排版的一部分，而不是文字被丢在一块空心地里。
+
+   图的高度有预算：竖图不硬撑满整列，按「高不超过 66vh（大图 84vh）」
+   反算宽度（gallery.js 里写 --w）。不这么做，一张 4:5 的竖图在
+   1296 宽的栏里会撑到 1600px 高，一张 658×10753 的长截图能把整页
+   拉成一万四千像素。
    ============================================================ */
 
 .works {
     max-width: var(--maxw);
     margin: 0 auto;
     padding: 0 var(--pad);
-    display: grid;
-    gap: clamp(72px, 13vh, 168px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(64px, 11vh, 140px);
 }
 
+/* 列表开头的一行索引：左边 INDEX，右边件数与年份跨度。
+   给这一大段作品一个「册」的开头，不然它是从纸边直接开始的 */
+.works__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: clamp(14px, 2vh, 20px);
+    border-bottom: 1px solid var(--line-soft);
+    /* 列表的 gap 是给作品之间的，标题行不该跟着吃满一整格：
+       把它往回拉一半，索引和第一张大图才是「同一段」的 */
+    margin-bottom: clamp(-56px, -5vh, -28px);
+}
+
+.works__kick {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: .42em;
+    color: var(--muted);
+}
+
+.works__sum {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    font-size: 11.5px;
+    letter-spacing: .18em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.works__sep {
+    color: rgba(242, 240, 236, .22);
+}
+
+/* 右侧那列索引是压在页边上的：正文给它让出一条沟，
+   否则 INDEX 行和通栏大图的说明会正好和刻度叠在一起（实测会） */
+@media (min-width: 1101px) {
+    .works {
+        padding-right: calc(var(--pad) + 28px);
+    }
+}
+
+/* 一件一行。左右对调靠 flex-direction，不再用 grid 的 column/row 互换 */
 .work {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: clamp(22px, 4.5vw, 74px);
-    align-items: center;
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(24px, 5vw, 76px);
 
     /* 入场：从下方带着模糊浮上来，和封面化开是同一套语言 */
     opacity: 0;
     transform: translateY(34px);
-    filter: blur(16px);
+    filter: blur(14px);
     transition:
         opacity .8s var(--ease),
         transform .95s var(--ease),
@@ -477,40 +549,61 @@ body.is-past .map-fab {
     filter: blur(0px);
 }
 
-/* 偶数项照片挪到右边，读起来像一页一页翻 */
-.work:nth-child(even) .work__fig {
-    grid-column: 2;
-    grid-row: 1;
+/* 图和说明各贴一边：横图刚好填满一行，竖图也不会缩在角落 */
+.work--left {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
 }
 
-.work:nth-child(even) .work__body {
-    grid-column: 1;
-    grid-row: 1;
+.work--right {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* 通栏大图：图和说明上下排，说明横跨整行 */
+.work--plate {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(18px, 3vh, 30px);
 }
 
 .work__fig {
-    margin: 0;
+    display: flex;
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    /* 滚动视差：JS 每帧写 --fig-y（±26px）。动的是照片，说明和序号
+       还钉在原地 —— 读起来是照片在纸面上飘，不是整块卡片在跳 */
+    transform: translate3d(0, var(--fig-y, 0px), 0);
+    will-change: transform;
 }
 
-.work__hit {
-    display: block;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-    cursor: zoom-in;
-    color: inherit;
-}
+.work--left .work__fig { justify-content: flex-start; }
+.work--right .work__fig { justify-content: flex-end; }
+.work--plate .work__fig { display: block; }
 
+/* 图片本身就是按钮（不再是 button 包 span 的两层壳）：
+   少一层，宽度才能由 aspect-ratio 反算 —— 见上面那段注释 */
 .work__frame {
     position: relative;
     display: block;
-    width: 100%;
-    overflow: hidden;
+    /* --w 由 JS 按「高度预算 ÷ 宽高比」写进来，单位是 vh，不是百分比：
+       百分比在这里会撞上「flex 子项宽度由内容撑开」的循环依赖，
+       浏览器解不出来就直接给 0 —— 整行图会消失 */
+    width: var(--w, 100%);
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
     border-radius: 3px;
     background: var(--ph);
-    /* 先按 4:3 撑开，图解码完 JS 会按真实比例改掉，避免整页跳一下 */
+    color: inherit;
+    overflow: hidden;
+    cursor: zoom-in;
+    /* 先按 4:3 撑开，图解码完 JS 按真实比例改掉，避免整页跳一下 */
     aspect-ratio: 4 / 3;
     /* 悬停时起一圈绿边 + 提起来的影子，跟图片自己推近是同一层回执 */
     transition: box-shadow .5s var(--ease);
@@ -518,8 +611,8 @@ body.is-past .map-fab {
 
 /* 鼠标停在照片上：图推近（见 .work__img 的 scale），外圈再起一层绿边和
    一道往下压的投影，把「这张能点开」从图里带到整张卡片上 */
-.work__hit:hover .work__frame,
-.work__hit:focus-visible .work__frame {
+.work__frame:hover,
+.work__frame:focus-visible {
     box-shadow: 0 0 0 1px rgba(155, 196, 111, .32), 0 34px 70px rgba(0, 0, 0, .5);
 }
 
@@ -564,15 +657,18 @@ body.is-past .map-fab {
     transform: scale(1.06);
     filter: blur(18px);
     /* 悬停推近走独立的 scale 属性，不跟上面那条 transform 抢同一栏：
-       transform 归「入场化开」，scale 归鼠标，两条过渡互不覆盖 */
+       transform 归「入场化开」，scale 归鼠标，两条过渡互不覆盖。
+       translate 留给「鼠标在照片上移动时的那点跟手偏移」，也是独立属性 */
     scale: 1;
+    translate: var(--tx, 0px) var(--ty, 0px);
     transition:
         opacity .85s var(--ease),
         transform 1.15s var(--ease),
         filter .85s var(--ease),
-        scale .9s var(--ease);
+        scale .9s var(--ease),
+        translate .3s var(--ease);
     /* 只有入场那三条要按 --dl 错峰，悬停必须在鼠标压上去的同一刻起步 */
-    transition-delay: var(--dl, 0ms), var(--dl, 0ms), var(--dl, 0ms), 0ms;
+    transition-delay: var(--dl, 0ms), var(--dl, 0ms), var(--dl, 0ms), 0ms, 0ms;
 }
 
 .work.is-loaded .work__img {
@@ -584,9 +680,39 @@ body.is-past .map-fab {
 /* 鼠标停在照片上：往里推近一点点，作为「这张能点开放大」的回执。
    幅度只到 4.5%，读起来是照片自己在呼吸，而不是整块卡片在弹。
    键盘走到同一个按钮上（focus-visible）给同一种回执。 */
-.work__hit:hover .work__img,
-.work__hit:focus-visible .work__img {
+.work__frame:hover .work__img,
+.work__frame:focus-visible .work__img {
     scale: 1.045;
+}
+
+/* 悬停时右上角浮出一个小圆，里面一个箭头：「能点开」的第二重回执。
+   触屏上永远没有 hover，所以窄屏那节把它钉成常驻（见文件末尾） */
+.work__zoom {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 50%;
+    background: rgba(8, 8, 10, .48);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+    line-height: 1;
+    color: rgba(255, 255, 255, .92);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .35s var(--ease), transform .35s var(--ease);
+}
+
+.work__frame:hover .work__zoom,
+.work__frame:focus-visible .work__zoom {
+    opacity: 1;
+    transform: none;
 }
 
 /* 加载失败就把占位停住并压暗，别让它一直装作还在转 */
@@ -601,14 +727,48 @@ body.is-past .map-fab {
     color: var(--muted);
 }
 
+/* ------------------------------------------------------------
+   说明栏
+
+   它不再跟着照片拉满一整列：内容贴着照片的**上沿**往下排，下面留白。
+   原来的做法是「序号钉顶端、标题压底边、中间用 1fr 撑开」—— 照片越高，
+   上面那块空就越大，读起来字全坠在底下。现在没有那根撑杆了，
+   竖线也只跟着文字这一小段走，干净。
+   ------------------------------------------------------------ */
+
 .work__body {
+    display: flex;
+    flex: 0 0 clamp(232px, 26vw, 360px);
+    flex-direction: column;
+    justify-content: flex-start;
+    align-self: stretch;
+    gap: clamp(14px, 2.4vh, 24px);
     min-width: 0;
-    display: grid;
-    gap: clamp(10px, 1.6vh, 18px);
-    align-content: center;
+    padding-block: 2px 4px;
+}
+
+/* 左右两栏：整体贴顶，高度只由内容决定（不再 align-self: stretch） */
+.work--left .work__body,
+.work--right .work__body {
+    align-self: flex-start;
+    gap: clamp(14px, 2.2vh, 22px);
+}
+
+/* 竖线对着照片那一侧：左图右文时在左边，右图左文时在右边 */
+.work--left .work__body {
+    border-left: 1px solid var(--line-soft);
+    padding-left: clamp(18px, 2.2vw, 30px);
+}
+
+.work--right .work__body {
+    border-right: 1px solid var(--line-soft);
+    padding-right: clamp(18px, 2.2vw, 30px);
 }
 
 .work__idx {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     margin: 0;
     font-size: 11px;
     letter-spacing: .34em;
@@ -616,9 +776,16 @@ body.is-past .map-fab {
     font-variant-numeric: tabular-nums;
 }
 
+.work__idx::after {
+    content: "";
+    width: 26px;
+    height: 1px;
+    background: var(--line);
+}
+
 .work__title {
     margin: 0;
-    font-size: clamp(21px, 2.5vw, 32px);
+    font-size: clamp(21px, 2.3vw, 30px);
     font-weight: 500;
     line-height: 1.35;
     letter-spacing: .02em;
@@ -637,24 +804,191 @@ body.is-past .map-fab {
 }
 
 .work:hover .work__title::after,
-.work__hit:focus-visible ~ .work__body .work__title::after {
+.work:focus-within .work__title::after {
     width: 66px;
     background: var(--accent);
 }
 
+.work__note {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.6vh, 16px);
+    min-width: 0;
+}
+
 .work__desc {
     margin: 0;
-    font-size: clamp(13.5px, 1.15vw, 15.5px);
+    font-size: clamp(13.5px, 1.1vw, 15px);
     line-height: 1.95;
     color: var(--ink-2);
 }
 
-/* 卡片上那行小字：作品所属的省份 */
-.work__prov {
+/* 年份 · 省份 · 城市：图注最底下一行小字，版式上像刊物的版权行 */
+.work__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
     margin: 0;
     font-size: 11px;
-    letter-spacing: .26em;
+    letter-spacing: .22em;
     color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.work__dot {
+    color: rgba(242, 240, 236, .2);
+}
+
+/* 图注里的年份和省份是真链接：年份去时间轴、省份去地图。
+   平时长得像正文，悬停才浮出底线 —— 免得一行小字变成一排按钮 */
+.work__meta a {
+    color: inherit;
+    padding-bottom: 1px;
+    border-bottom: 1px solid rgba(242, 240, 236, .14);
+    transition: color .25s, border-color .25s;
+}
+
+.work__meta a:hover {
+    color: var(--ink);
+    border-color: var(--accent);
+}
+
+/* 从别的页用 ?work=<id> 跳过来时，那件作品短暂亮一下 ——
+   否则滚到跟前也认不出是哪一张 */
+.work.is-flash .work__frame {
+    animation: workFlash 2.6s var(--ease) both;
+}
+
+@keyframes workFlash {
+    0%   { box-shadow: 0 0 0 1px rgba(155, 196, 111, 0); }
+    16%  { box-shadow: 0 0 0 1px var(--accent), 0 0 64px rgba(155, 196, 111, .3); }
+    72%  { box-shadow: 0 0 0 1px rgba(155, 196, 111, .55), 0 0 26px rgba(155, 196, 111, .14); }
+    100% { box-shadow: 0 0 0 1px rgba(155, 196, 111, 0); }
+}
+
+/* 通栏大图那一档：说明横过来，左边序号 + 大标题，右边一句话和版权行 */
+.work--plate .work__body {
+    display: grid;
+    flex: none;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: clamp(24px, 4vw, 72px);
+    row-gap: clamp(10px, 1.6vh, 16px);
+    align-self: auto;
+    padding-top: clamp(16px, 2.6vh, 26px);
+    border-top: 1px solid var(--line-soft);
+}
+
+.work--plate .work__idx {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.work--plate .work__title {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: clamp(26px, 3.1vw, 42px);
+    letter-spacing: .01em;
+    line-height: 1.25;
+}
+
+.work--plate .work__title::after {
+    margin-top: clamp(14px, 2.2vh, 22px);
+}
+
+.work--plate .work__note {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: end;
+    gap: clamp(12px, 2vh, 18px);
+}
+
+.work--plate .work__desc {
+    max-width: 46ch;
+    font-size: clamp(14px, 1.2vw, 16px);
+}
+
+/* ============================================================
+   右侧作品索引：一条极细的刻度尺
+
+   只在大屏出现、滚过封面才淡进来；当前那一件变成绿色并长出一点。
+   一页十几件作品，有了这根尺子才知道自己读到第几张、还剩几张，
+   点一下就能跳过去 —— 这是这一页最像「展厅」的一处。
+   ============================================================ */
+
+.rail {
+    position: fixed;
+    top: 50%;
+    right: clamp(12px, 1.8vw, 26px);
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 14px;
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .55s var(--ease);
+}
+
+body.is-past .rail {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.is-lb .rail {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.rail__now {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: .2em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.rail__num {
+    color: var(--accent);
+}
+
+.rail__list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rail__item {
+    display: block;
+    padding: 4px 0 4px 12px;
+}
+
+.rail__tick {
+    display: block;
+    width: 14px;
+    height: 1px;
+    background: rgba(242, 240, 236, .22);
+    transition: width .4s var(--ease), background .4s var(--ease), box-shadow .4s var(--ease);
+}
+
+.rail__item:hover .rail__tick {
+    width: 22px;
+    background: rgba(242, 240, 236, .6);
+}
+
+.rail__item.is-on .rail__tick {
+    width: 28px;
+    background: var(--accent);
+    box-shadow: 0 0 9px rgba(155, 196, 111, .55);
 }
 
 /* ============================================================
@@ -705,26 +1039,107 @@ body.is-past .map-fab {
 }
 
 /* ============================================================
+   作品集尽头的结语入口：这一句收进了独立页 closing.html，
+   首页这里只留一个居中在横线上方的按钮，点进去字字浮现。
+   和 .foot 同一套守卫：脚本没跑时默认可见，不让动画把它藏掉。
+   ============================================================ */
+
+.closing {
+    max-width: var(--maxw);
+    margin: clamp(96px, 18vh, 220px) auto 0;
+    padding: clamp(56px, 9vh, 110px) var(--pad);
+    text-align: center;
+    position: relative;
+}
+
+.js .closing {
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity .9s var(--ease), transform .9s var(--ease);
+}
+
+.js .closing.is-in {
+    opacity: 1;
+    transform: none;
+}
+
+/* 按钮：衬线、描边、带一点草绿，hover 微微亮起来 */
+.closing__btn {
+    display: inline-block;
+    margin: 0 auto clamp(26px, 4vh, 40px);
+    padding: 12px 28px;
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC",
+        "Source Han Serif SC", Georgia, serif;
+    font-size: clamp(15px, 2vw, 18px);
+    letter-spacing: .14em;
+    color: #F2F0EC;
+    text-decoration: none;
+    border: 1px solid rgba(155, 196, 111, .5);
+    border-radius: 999px;
+    background: rgba(155, 196, 111, .05);
+    transition: color .3s, border-color .3s, background .3s, box-shadow .3s;
+}
+
+.closing__btn:hover {
+    color: #fff;
+    border-color: var(--accent);
+    background: rgba(155, 196, 111, .14);
+    box-shadow: 0 0 22px rgba(155, 196, 111, .35);
+}
+
+/* 装饰线：中间亮、两端淡出，带一点辉光，垫在按钮下方 */
+.closing__line {
+    display: block;
+    width: clamp(56px, 8vw, 84px);
+    height: 1px;
+    margin: 0 auto 0;
+    background: linear-gradient(90deg, transparent, var(--accent) 42%, var(--accent) 58%, transparent);
+    box-shadow: 0 0 18px rgba(155, 196, 111, .45);
+}
+
+
+/* ============================================================
    骨架 / 空态
    ============================================================ */
 
 .sk {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: clamp(22px, 4.5vw, 74px);
-    align-items: center;
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(24px, 5vw, 76px);
 }
 
+.sk--plate {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(18px, 3vh, 30px);
+}
+
+/* 骨架也照三档尺寸来：第一格是通栏大图，后面两格带一段边注 */
 .sk__box {
-    width: 100%;
+    flex: 0 1 auto;
+    width: auto;
+    height: 62vh;
     border-radius: 3px;
     background: var(--ph);
     animation: pulse 1.6s ease-in-out infinite;
 }
 
+.sk--plate .sk__box {
+    width: 100%;
+    height: auto;
+}
+
 .sk__side {
     display: grid;
+    flex: 0 0 clamp(232px, 26vw, 360px);
+    align-self: stretch;
+    align-content: space-between;
     gap: 14px;
+}
+
+.sk--plate .sk__side {
+    flex: none;
+    align-content: start;
 }
 
 .sk__bar {
@@ -862,6 +1277,10 @@ body.is-past .map-fab {
     margin: 0 9px;
 }
 
+#lbProv:empty + .lb__dot {
+    display: none;
+}
+
 .lb__nav,
 .lb__close {
     position: absolute;
@@ -931,30 +1350,91 @@ body.is-past .map-fab {
    窄屏
    ============================================================ */
 
+/* 索引那一列在窄屏上没有位置：手指够不到页边，一列刻度也只剩装饰 */
+@media (max-width: 1100px) {
+    .rail {
+        display: none;
+    }
+}
+
 @media (max-width: 880px) {
+    /* 单列时照片永远在上面：左右对调取消，说明栏落到图下面，
+       不再「撑满整行高度」，序号和标题回到正常的一段文字 */
     .work,
+    .work--left,
+    .work--right,
+    .work--plate,
     .sk {
-        grid-template-columns: 1fr;
-        gap: clamp(18px, 3.4vh, 30px);
+        flex-direction: column;
+        align-items: stretch;
+        gap: clamp(18px, 3.4vh, 28px);
     }
 
-    /* 单列时照片永远在上面，交替顺序取消 */
-    .work:nth-child(even) .work__fig,
-    .work:nth-child(even) .work__body {
-        grid-column: 1;
-        grid-row: auto;
+    .work--left .work__fig,
+    .work--right .work__fig,
+    .work--plate .work__fig {
+        display: block;
     }
 
-    .work__body {
+    .work__frame {
+        width: 100%;
+    }
+
+    .work__body,
+    .work--left .work__body,
+    .work--right .work__body,
+    .work--plate .work__body {
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: clamp(12px, 2.2vh, 18px);
+        align-self: auto;
+        padding: 0;
+        border: 0;
+    }
+
+    .work__note,
+    .work--plate .work__note {
+        /* 通栏那一档在桌面上是 align-self: end（贴着格子的底边），
+           塌成单列之后它会把描述挤到右边去，这里得拉回整行 */
+        align-self: stretch;
         gap: 10px;
+    }
+
+    .work__title,
+    .work--plate .work__title {
+        font-size: clamp(20px, 5.6vw, 26px);
     }
 
     .work__title::after {
         margin-top: 12px;
     }
 
+    /* 触屏没有 hover，「能点开」得常驻在那里 */
+    .work__zoom {
+        opacity: 1;
+        transform: none;
+    }
+
     .works {
-        gap: clamp(58px, 9vh, 88px);
+        gap: clamp(52px, 9vh, 88px);
+    }
+
+    .works__head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .sk__box {
+        width: 100%;
+        height: auto;
+    }
+
+    .sk__side,
+    .sk--plate .sk__side {
+        flex: none;
     }
 
     .lb__nav {
@@ -990,6 +1470,13 @@ body.is-past .map-fab {
         animation: none;
     }
 
+    /* 「闪一下」是纯装饰，撤成一条静态的绿色描边 —— 从别的页 ?work= 跳过来时
+       仍然看得出是哪一张，只是不闪了 */
+    .work.is-flash .work__frame {
+        animation: none;
+        box-shadow: 0 0 0 1px var(--accent);
+    }
+
     /* 入场那两行文字回到静止可见（keyframes 的 fill: both 被撤掉后
        就是这个默认态），不靠动画撑着 */
     .hero__kicker,
@@ -1018,8 +1505,8 @@ body.is-past .map-fab {
 
     /* 不让它推近（位移类的动效一律撤掉），换成一点亮度当悬停回执，
        不然这一档下鼠标压上去会毫无反应 */
-    .work__hit:hover .work__img,
-    .work__hit:focus-visible .work__img {
+    .work__frame:hover .work__img,
+    .work__frame:focus-visible .work__img {
         scale: 1;
         filter: brightness(1.14);
     }
@@ -1032,11 +1519,11 @@ body.is-past .map-fab {
     }
 
     /* 让位时那个上滑不要了，只留淡出 */
-    .map-fab {
+    .hero-nav {
         transition-duration: .2s;
     }
 
-    body.is-past .map-fab {
+    body.is-past .hero-nav {
         transform: none;
     }
 }

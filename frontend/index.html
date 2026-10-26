@@ -50,24 +50,34 @@
     <a class="bar__mark" href="#top" aria-label="回到顶部"><span class="bar__dot"></span></a>
     <!-- 两个链接包一层：.bar 自己是 space-between，直接塞第三个元素会给摆到正中间 -->
     <nav class="bar__links">
+        <a class="bar__link" href="device/index.html">设备介绍</a>
         <a class="bar__link" href="map.html">作品地图</a>
-        <a class="bar__link" href="admin.html">后台管理</a>
     </nav>
 </header>
 
-<!-- 首屏时 .bar 还收在屏幕外，没这个按钮就进不去地图。
-     滚过封面后 .bar 滑下来，它让位 —— 两个入口不同时出现（见 gallery.css） -->
-<a class="map-fab" href="map.html">作品地图</a>
+<!-- 首屏时 .bar 还收在屏幕外，这两个胶囊就是首屏唯一的入口。
+     滚过封面后 .bar 滑下来，它们让位 —— 见 gallery.css 的 .hero-nav -->
+<nav class="hero-nav" aria-label="站点导航">
+    <a class="hero-nav__link" href="device/index.html">设备介绍</a>
+    <a class="hero-nav__link" href="map.html">作品地图</a>
+</nav>
 
 <main class="flow" id="flow">
 
     <section class="works" id="works" aria-busy="true"></section>
 
+    <!-- 作品集尽头的结语入口：一句话收进独立页（closing.html），
+         这里只留一个居中在横线上方的按钮，点进去字字浮现。 -->
+    <section class="closing" id="closing" aria-label="结语">
+        <a class="closing__btn" href="closing.html">"?"</a>
+        <span class="closing__line" aria-hidden="true"></span>
+    </section>
+
     <footer class="foot">
         <div class="foot__meta">
             <a href="#top">回到顶部 ↑</a>
+            <a href="device/index.html">设备介绍</a>
             <a href="map.html">作品地图</a>
-            <a href="admin.html">后台管理</a>
         </div>
     </footer>
 

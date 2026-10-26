@@ -87,7 +87,7 @@ public class WorkService {
     }
 
     public Work create(List<String> provinces, String title, String desc, String city, long takenAt,
-                       MultipartFile before, MultipartFile after) {
+                       MultipartFile file) {
         if (title == null || title.trim().isEmpty()) {
             throw new BizException("标题不能为空");
         }
@@ -99,25 +99,17 @@ public class WorkService {
             // 前端有 maxlength 兜着，这里是防绕过（curl / 改前端）的最后一道
             throw new BizException("描述最多 " + DESC_MAX + " 个字");
         }
-        // 城市名在存图**之前**校验：放后面的话，名字不合法会抛异常，而两张图已经
-        // 落在 uploads/ 里了，没有任何记录指着它们，成了永远清不掉的孤儿
+        // 城市名在存图**之前**校验：放后面的话，名字不合法会抛异常，而图已经
+        // 落在 uploads/ 里了，没有任何记录指着它，成了永远清不掉的孤儿
         String cleanCity = checkCity(city);
 
-        String beforeUrl = fileStorageService.save(before, "Before 图片");
-        String afterUrl;
-        try {
-            afterUrl = fileStorageService.save(after, "After 图片");
-        } catch (RuntimeException e) {
-            // After 失败时回滚已落盘的 Before，避免产生孤儿文件
-            fileStorageService.deleteByUrl(beforeUrl);
-            throw e;
-        }
+        String afterUrl = fileStorageService.save(file, "作品图片");
 
         Work work = new Work();
         work.setId(idGen.getAndIncrement());
         work.setTitle(title.trim());
         work.setDesc(cleanDesc);
-        work.setBeforeUrl(beforeUrl);
+        work.setBeforeUrl(null);
         work.setAfterUrl(afterUrl);
         work.setCreateTime(System.currentTimeMillis());
         work.setProvinces(provinces);

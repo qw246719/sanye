@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>SONY α7C × G MASTER — 交互式 3D 拆解</title>
+<meta name="description" content="使用 Three.js 纯代码生成的索尼 α7C 与 FE 24-70mm F2.8 GM II 交互式三维拆解可视化。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- 背景层 -->
+  <div class="bg" aria-hidden="true">
+    <div class="bg-radial"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-noise"></div>
+    <div class="bg-scan"></div>
+    <div class="bg-vignette"></div>
+  </div>
+
+  <!-- 3D 舞台 -->
+  <canvas id="stage"></canvas>
+
+  <!-- 3D 标注 -->
+  <svg id="leaders" aria-hidden="true"></svg>
+  <div id="labels" aria-hidden="true"></div>
+
+  <!-- 顶栏 -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span>α</span></div>
+      <div class="brand-copy">
+        <div class="brand-title"><span class="sony">SONY</span><b>α7C</b><i>×</i><b class="gm">G MASTER</b></div>
+        <div class="brand-sub">INTERACTIVE TEARDOWN <span>/</span> 交互式三维拆解</div>
+      </div>
+    </div>
+    <!-- 回作品辑。放在 brand 和 hud 中间，窄屏 hud 收掉后它自然落到最右 -->
+    <a class="to-site" href="../index.html">← 作品列表</a>
+    <div class="hud">
+      <div class="hud-item">
+        <span class="hud-k">STATUS</span>
+        <span class="hud-v" id="hudStatus">ASSEMBLED</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-k">EXPLODED</span>
+        <span class="hud-v"><b id="hudCount">00</b><i>/22</i></span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-k">VIEW</span>
+        <span class="hud-v" id="hudView">ORBIT</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 左：部件清单 -->
+  <aside id="partsPanel" class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="dot"></span>部件清单</div>
+      <div class="panel-meta">COMPONENTS <b id="partCount">22</b></div>
+    </div>
+    <div class="part-list" id="partList"></div>
+    <div class="panel-foot">
+      <span class="k">CLICK</span> 选择并拆解 · 再次点击归位
+    </div>
+  </aside>
+
+  <!-- 右：详情 / 参数 -->
+  <aside id="infoPanel" class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="dot orange"></span><span id="infoHeadTitle">整机参数</span></div>
+      <div class="panel-meta" id="infoHeadMeta">SPECIFICATION</div>
+    </div>
+    <div class="info-scroll" id="infoScroll">
+      <div id="infoDefault" class="info-page"></div>
+      <div id="infoPart" class="info-page" hidden></div>
+    </div>
+  </aside>
+
+  <!-- 底部控制 -->
+  <div id="dock">
+    <div class="dock-btns">
+      <button class="btn primary" data-act="explode" title="全部拆解 (Space)">
+        <svg viewBox="0 0 24 24"><path d="M12 3v6M12 3l-3 3M12 3l3 3M12 21v-6M12 21l-3-3M12 21l3-3M3 12h6M3 12l3-3M3 12l3 3M21 12h-6M21 12l-3-3M21 12l-3 3"/></svg>
+        <span>全部拆解</span>
+      </button>
+      <button class="btn" data-act="assemble" title="全部组装 (Space)">
+        <svg viewBox="0 0 24 24"><path d="M12 8V3M12 3L9 6M12 3l3 3M12 16v5M12 21l-3-3M12 21l3-3M8 12H3M3 12l3-3M3 12l3 3M16 12h5M21 12l-3-3M21 12l-3 3"/></svg>
+        <span>全部组装</span>
+      </button>
+      <span class="dock-sep"></span>
+      <button class="btn" data-act="reset" title="重置视角 (R)">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4.5h4.5"/></svg>
+        <span>重置视角</span>
+      </button>
+      <button class="btn toggle" data-act="rotate" title="自动旋转 (A)">
+        <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.4 4.2M12 5V2M12 5l2.6-1.6"/></svg>
+        <span>自动旋转</span>
+      </button>
+      <button class="btn toggle" data-act="labels" title="显示标注 (L)">
+        <svg viewBox="0 0 24 24"><path d="M3 12V4h8l9 9-8 8-9-9Z"/><circle cx="7.5" cy="8.5" r="1.4"/></svg>
+        <span>标注</span>
+      </button>
+    </div>
+    <div class="dock-hint">
+      <span><b>拖拽</b> 旋转</span><span class="sep">·</span>
+      <span><b>滚轮</b> 缩放</span><span class="sep">·</span>
+      <span><b>右键</b> 平移</span><span class="sep">·</span>
+      <span><b>点击部件</b> 拆解 / 查看</span>
+      <span class="sep">·</span>
+      <span class="keys"><kbd>SPACE</kbd> 拆解 <kbd>R</kbd> 复位 <kbd>L</kbd> 标注</span>
+    </div>
+  </div>
+
+  <!-- 首次操作引导 -->
+  <div id="guide" class="guide">
+    <div class="guide-item"><b>01</b><span>拖拽旋转 · 滚轮缩放</span></div>
+    <div class="guide-item"><b>02</b><span>点击任意部件触发拆解</span></div>
+    <div class="guide-item"><b>03</b><span>右侧面板查看参数详情</span></div>
+  </div>
+
+  <!-- 启动遮罩 -->
+  <div id="boot" class="boot">
+    <div class="boot-grid" aria-hidden="true"></div>
+    <div class="boot-core">
+      <div class="boot-mark">α</div>
+      <div class="boot-title">SONY <b>α7C</b></div>
+      <div class="boot-sub">G MASTER · INTERACTIVE TEARDOWN</div>
+      <div class="boot-bar"><i></i></div>
+      <div class="boot-meta">
+        <span id="bootStatus">INITIALIZING OPTICAL SYSTEM</span>
+        <span>DSH / THREE.JS R160</span>
+      </div>
+    </div>
+    <div class="boot-corner tl"></div>
+    <div class="boot-corner tr"></div>
+    <div class="boot-corner bl"></div>
+    <div class="boot-corner br"></div>
+  </div>
+
+  <div id="webglError" class="webgl-error" hidden>
+    <b>无法初始化 WebGL</b>
+    <p>请使用支持 WebGL2 的现代浏览器打开本页面。</p>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/model.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

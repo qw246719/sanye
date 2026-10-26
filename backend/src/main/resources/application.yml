@@ -14,6 +14,8 @@ spring:
 app:
   # 图片存放目录（相对启动目录）
   upload-dir: ./uploads
+  # 后台管理密码（前端 admin 页会先验证这个才对用户放开）
+  admin-password: sanye123
   # 作品元数据 JSON 文件
   data-file: ./data/works.json
   # 站点配置（首屏封面 + 文字 + 字体）JSON 文件

@@ -189,7 +189,7 @@
     border-color: var(--accent);
 }
 
-/* 两个并排的框：上传那两张图，以及「拍摄城市 + 拍摄日期」那行都用它。
+/* 两个并排的框：「拍摄城市 + 拍摄日期」那一行用它。
    并排而不是上下摞，是为了别把左边这张表单撑得比右边那个列表框高太多 */
 .upload-row {
     display: grid;
@@ -215,14 +215,6 @@
     font-weight: 700;
     letter-spacing: .5px;
     margin-bottom: 8px;
-}
-
-/* 黑底上要提亮：原来那对是给米白底配的，压到深色面板上会糊成一团 */
-.upload-box__label--before {
-    color: #E0A96A;
-}
-
-.upload-box__label--after {
     color: var(--accent);
 }
 
@@ -537,4 +529,85 @@
     .admin-item__actions {
         grid-column: 1 / -1;
     }
+}
+
+/* ============================================================
+   后台登录门：fixed 盖住整页，密码对上（admin.js 加 .is-open）才淡出。
+   必须放 body 第一个子节点：自己带 backdrop-filter，祖先再有滤镜就
+   会变成包含块，fixed 就不再相对视口定位了。
+   ============================================================ */
+/* 密码门：盖住整页，密码对上（admin.js 加 .is-open）才淡出。
+   背景用纯色不透 —— 后面是后台表单，不能让内容透出来。 */
+.admin-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background: #08080a;
+    transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+/* 密码通过：淡出并彻底失去点击 */
+.admin-gate.is-open {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.admin-gate__inner {
+    width: min(320px, 86vw);
+    text-align: center;
+}
+
+.admin-gate__dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: var(--accent, #c6a15b);
+    box-shadow: 0 0 22px rgba(198, 161, 91, 0.55);
+}
+
+.admin-gate__kicker {
+    margin: 0 0 22px;
+    font-size: 15px;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.admin-gate__form {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-gate__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px 15px;
+    font: inherit;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-gate__input:focus {
+    border-color: var(--accent, #c6a15b);
+    box-shadow: 0 0 0 3px rgba(198, 161, 91, 0.18);
+}
+
+.admin-gate__input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.admin-gate__err {
+    min-height: 1.2em;
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #ff6b6b;
 }

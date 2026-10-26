@@ -1,6 +1,6 @@
 /* ============================================================
    后台管理页
-   - 表单提交：FormData 上传两张图 -> POST /api/work
+   - 表单提交：FormData 上传一张图 -> POST /api/work
    - 列表渲染：GET /api/works
    - 改作品的拍摄城市 / 日期：PUT /api/work/{id}（列表里每行那个「编辑」）
    - 删除：DELETE /api/work/{id}
@@ -10,7 +10,7 @@
    ============================================================ */
 
 import {
-    fetchSiteConfig, fetchWorks, uploadWork, updateWork, removeWork,
+    fetchSiteConfig, fetchWorks, uploadWork, updateWork, removeWork, adminLogin,
     uploadCover, clearCover,
     fetchProvinceProfiles, saveProvinceNote, uploadProvinceCover, clearProvinceCover,
     toast, escapeHtml, formatTime, assetUrl,
@@ -26,9 +26,7 @@ const cityEl = document.getElementById('city');
 const takenAtEl = document.getElementById('takenAt');
 const chipsEl = document.getElementById('provinceChips');
 const provCountEl = document.getElementById('provCount');
-const beforeEl = document.getElementById('beforeFile');
 const afterEl = document.getElementById('afterFile');
-const beforePreviewEl = document.getElementById('beforePreview');
 const afterPreviewEl = document.getElementById('afterPreview');
 const submitBtn = document.getElementById('submitBtn');
 const listEl = document.getElementById('adminList');
@@ -62,6 +60,55 @@ let previewUrls = {};
 // 事件只绑一次（init 可能因重试被再次调用）
 bindEvents();
 init();
+setupAdminGate();
+
+/* ---------------- 后台登录门 ---------------- */
+
+/* 密码门盖住整页。输对密码（POST /api/admin/login 返回 ok）才给 .is-open 揭开。
+   后台主体在门后面照常加载，所以门一开就已经是就绪状态。 */
+function setupAdminGate() {
+    const gate = document.getElementById('adminGate');
+    const form = document.getElementById('adminLoginForm');
+    const input = document.getElementById('adminPassword');
+    const errEl = document.getElementById('adminGateErr');
+    if (!gate || !form || !input || !errEl) {
+        return;
+    }
+
+    // 起手把光标停在密码框上，进门就能直接敲
+    input.focus();
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.textContent = '';
+
+        const password = input.value;
+        if (!password) {
+            errEl.textContent = '请输入密码';
+            input.focus();
+            return;
+        }
+
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = true;
+        }
+        try {
+            await adminLogin(password);
+            gate.classList.add('is-open');   // 淡出并失去点击
+            input.value = '';
+        } catch (err) {
+            errEl.textContent = err.message || '密码错误';
+            input.value = '';
+            input.focus();
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+            }
+        }
+    });
+}
+
 
 async function init() {
     renderListSkeleton();
@@ -105,7 +152,6 @@ function updateProvCount() {
 }
 
 function bindEvents() {
-    beforeEl.addEventListener('change', () => showPreview(beforeEl, beforePreviewEl, 'before'));
     afterEl.addEventListener('change', () => showPreview(afterEl, afterPreviewEl, 'after'));
     descEl.addEventListener('input', updateDescCount);
     formEl.addEventListener('submit', onSubmit);
@@ -182,8 +228,7 @@ async function onSubmit(e) {
     const provinces = selectedProvinces();
     const city = cityEl.value.trim();
     const takenAt = dateToEpoch(takenAtEl.value);
-    const beforeFile = beforeEl.files[0];
-    const afterFile = afterEl.files[0];
+    const file = afterEl.files[0];
 
     // 前端先做一轮校验，减少无意义的请求。
     // 省份不在校验之列：一个都不勾是合法状态（未归类），不是漏填
@@ -192,16 +237,16 @@ async function onSubmit(e) {
         titleEl.focus();
         return;
     }
-    if (!beforeFile || !afterFile) {
-        toast('Before 和 After 两张图都要选', 'err');
+    if (!file) {
+        toast('请选择一张图片', 'err');
         return;
     }
-    if (beforeFile.size > 10 * 1024 * 1024 || afterFile.size > 10 * 1024 * 1024) {
+    if (file.size > 10 * 1024 * 1024) {
         toast('单张图片不能超过 10MB', 'err');
         return;
     }
 
-    // 城市名超长交给后端报错也行，但那要等两张图都传完才知道，白等一趟
+    // 城市名超长交给后端报错也行，但那要等图都传完才知道，白等一趟
     if (city.length > CITY_MAX) {
         toast(`城市名最多 ${CITY_MAX} 个字`, 'err');
         cityEl.focus();
@@ -211,7 +256,7 @@ async function onSubmit(e) {
     submitBtn.disabled = true;
     submitBtn.textContent = '上传中…';
     try {
-        const work = await uploadWork({ title, desc, provinces, city, takenAt, beforeFile, afterFile });
+        const work = await uploadWork({ title, desc, provinces, city, takenAt, file });
         toast('上传成功', 'ok');
         resetForm();
         works.unshift(work);
@@ -233,13 +278,10 @@ function resetForm() {
         .forEach(chip => chip.setAttribute('aria-pressed', 'false'));
     updateProvCount();
 
-    ['before', 'after'].forEach(key => {
-        if (previewUrls[key]) {
-            URL.revokeObjectURL(previewUrls[key]);
-            delete previewUrls[key];
-        }
-    });
-    beforePreviewEl.textContent = '未选择';
+    if (previewUrls.after) {
+        URL.revokeObjectURL(previewUrls.after);
+        delete previewUrls.after;
+    }
     afterPreviewEl.textContent = '未选择';
     updateDescCount();
 }
@@ -531,7 +573,7 @@ function renderList() {
         <div class="admin-item" data-id="${w.id}">
             <div class="admin-item__thumb">
                 <!-- 列表每次增删都会整体重建，这里不用 lazy，否则缩略图会闪一下空白 -->
-                <img src="${escapeHtml(assetUrl(w.beforeUrl))}" alt="${escapeHtml(w.title)} 修图前" decoding="async">
+                <img src="${escapeHtml(assetUrl(w.afterUrl || w.beforeUrl))}" alt="${escapeHtml(w.title)}" decoding="async">
             </div>
             <div>
                 <h4 class="admin-item__title" title="${escapeHtml(w.title)}">${escapeHtml(w.title)}</h4>

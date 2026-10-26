@@ -16,7 +16,9 @@
 export function fitBox(nw, nh) {
     const padX = innerWidth < 620 ? 24 : 96;
     const padTop = 64;
-    const padBottom = 118;
+    // 三行图注（标题 + 一句话 + 版权行）加 18px 间距要占掉约 80px，
+    // 原来给 118，正好把它压到最底下那行「← → 切换 · ESC 关闭」上
+    const padBottom = 156;
     const maxW = Math.max(80, innerWidth - padX * 2);
     const maxH = Math.max(80, innerHeight - padTop - padBottom);
 

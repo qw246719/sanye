@@ -3,7 +3,7 @@ package com.sanye.model;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 一件作品 = 一张 before + 一张 after */
+/** 一件作品。新上传的是单张图（存 afterUrl）；beforeUrl 留给早期数据，可为空 */
 public class Work {
 
     private Long id;
@@ -16,7 +16,7 @@ public class Work {
     private String title;
     /** 作者自己写的一句话描述，前台显示在照片旁边，最长 50 字，可为空 */
     private String desc;
-    /** 修图前图片地址，形如 /uploads/xxx.jpg */
+    /** 修图前图片地址（单图上传后不再填，兼容早期 before/after 数据），形如 /uploads/xxx.jpg */
     private String beforeUrl;
     /** 修图后图片地址 */
     private String afterUrl;

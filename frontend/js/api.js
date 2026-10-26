@@ -55,23 +55,34 @@ export const DESC_MAX = 50;
 export const CITY_MAX = 20;
 
 /**
- * POST /api/work —— 两张图 + 标题 + 一句话描述 + 省份（可多选、可为空）+ 拍摄信息
+ * POST /api/work —— 一张图 + 标题 + 一句话描述 + 省份（可多选、可为空）+ 拍摄信息
  *
  * provinces 用重复字段传，Spring 那边收成 List<String>；一个省都不选时
  * 就一个都不 append，后端那个参数是 required = false，会当空表处理。
  *
  * city / takenAt 都可选：takenAt 是 dateToEpoch 算出来的毫秒数，没填传 0。
  */
-export function uploadWork({ title, desc, provinces, city, takenAt, beforeFile, afterFile }) {
+export function uploadWork({ title, desc, provinces, city, takenAt, file }) {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('desc', desc || '');
     (provinces || []).forEach(name => fd.append('provinces', name));
     fd.append('city', city || '');
     fd.append('takenAt', String(takenAt || 0));
-    fd.append('before', beforeFile);
-    fd.append('after', afterFile);
+    fd.append('file', file);
     return request('/api/work', { method: 'POST', body: fd });
+}
+
+/**
+ * POST /api/admin/login —— 后台登录校验。密码不对时后端抛业务异常，
+ * request() 会把它转成 Error（msg 即「密码错误」），由调用方 catch。
+ */
+export function adminLogin(password) {
+    return request('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password || '' }),
+    });
 }
 
 /**

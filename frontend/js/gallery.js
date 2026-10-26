@@ -50,6 +50,7 @@ const state = {
     works: [],
 };
 
+
 /* ---------------- 启动 ---------------- */
 
 init();
@@ -64,6 +65,7 @@ async function init() {
     bindLightbox();
     showSkeletons();
     revealFooter();
+    revealClosing();
 
     let works = null;
     try {
@@ -77,6 +79,9 @@ async function init() {
         title: w.title || '未命名',
         desc: w.desc || '',
         provinces: Array.isArray(w.provinces) ? w.provinces : [],
+        // 城市和拍摄日期是后来加的字段（老作品没有），图注用得上就顺手带上
+        city: w.city || '',
+        takenAt: Number(w.takenAt) || 0,
         url: assetUrl(w.afterUrl),
         ratio: '4 / 3',
     })).filter(w => w.url);
@@ -91,6 +96,7 @@ async function init() {
     }
 
     renderWorks();
+    focusFromQuery();
 }
 
 function showNote(html) {
@@ -178,6 +184,23 @@ function revealFooter() {
     ioFoot.observe(footEl);
 }
 
+/* 作品集尽头的结尾语：滚到眼前才浮现。和页脚同一套观察器，各管各的 */
+function revealClosing() {
+    const el = document.getElementById('closing');
+    if (!el) {
+        return;
+    }
+    const ioClosing = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+            if (e.isIntersecting) {
+                el.classList.add('is-in');
+                ioClosing.disconnect();
+            }
+        });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: .1 });
+    ioClosing.observe(el);
+}
+
 /* ---------------- 首屏封面 ---------------- */
 
 /*
@@ -263,6 +286,96 @@ function swapHero(url) {
     });
 }
 
+/* ============================================================
+   列表的两层「动」
+
+   1. 滚动视差：照片比页面慢半拍地飘（动的是 .work__fig，说明不动）
+   2. 指针跟手：鼠标在照片上移动时，图在里面偏一点点 —— 只有真有 hover
+      的设备才开，触屏上没有任何意义
+   ============================================================ */
+
+function initParallax() {
+    if (reduced || !matchMedia('(min-width: 881px)').matches) {
+        return;
+    }
+    const cards = [...worksEl.querySelectorAll('.work')];
+    let raf = 0;
+
+    function frame() {
+        raf = 0;
+        const mid = innerHeight / 2;
+        cards.forEach(card => {
+            const r = card.getBoundingClientRect();
+            if (r.bottom < -180 || r.top > innerHeight + 180) {
+                return;
+            }
+            // 卡片中心离屏幕中线越远，偏得越多。上限只给 ±14px —— 说明栏是
+            // 和照片底边对齐的，飘太多两者就散架了，这是「呼吸」不是「漂移」
+            const d = (r.top + r.height / 2 - mid) / innerHeight;
+            const y = Math.max(-14, Math.min(14, d * -36));
+            card.style.setProperty('--fig-y', `${y.toFixed(1)}px`);
+        });
+    }
+
+    function onScroll() {
+        if (!raf) {
+            raf = requestAnimationFrame(frame);
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    frame();
+}
+
+function bindPointerPan() {
+    if (reduced || !matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        return;
+    }
+    worksEl.querySelectorAll('.work__frame').forEach(frame => {
+        let rect = null;
+
+        frame.addEventListener('pointerenter', () => {
+            rect = frame.getBoundingClientRect();
+        });
+
+        frame.addEventListener('pointermove', (e) => {
+            if (!rect) {
+                rect = frame.getBoundingClientRect();
+            }
+            const x = (e.clientX - rect.left) / rect.width - .5;
+            const y = (e.clientY - rect.top) / rect.height - .5;
+            frame.style.setProperty('--tx', `${(x * 22).toFixed(1)}px`);
+            frame.style.setProperty('--ty', `${(y * 16).toFixed(1)}px`);
+        });
+
+        frame.addEventListener('pointerleave', () => {
+            rect = null;
+            frame.style.setProperty('--tx', '0px');
+            frame.style.setProperty('--ty', '0px');
+        });
+    });
+}
+
+/* 从别的页用 ?work=<id> 跳过来：滚到那一件、闪一下，再把查询串擦掉 ——
+   不擦的话刷新一次又跳一次。id 对不上就安静停着，不弹错 */
+function focusFromQuery() {
+    const id = new URLSearchParams(location.search).get('work');
+    if (!id) {
+        return;
+    }
+    const el = [...worksEl.querySelectorAll('.work')].find(w => w.dataset.id === id);
+    if (!el) {
+        return;
+    }
+    history.replaceState(null, '', location.pathname + location.hash);
+    requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+        el.classList.add('is-flash');
+        setTimeout(() => el.classList.remove('is-flash'), 2800);
+    });
+}
+
 /* ---------------- 作品列表 ---------------- */
 
 const io = new IntersectionObserver(onReveal, {
@@ -282,6 +395,8 @@ function onReveal(entries) {
         });
 }
 
+/* 一件作品一行，三档尺寸轮着走：每 4 件的第一件是通栏大图，
+   剩下两件左右对调。原来是每一件都一模一样的一左一右，滚起来像表格 */
 function renderWorks() {
     io.disconnect();
     worksEl.innerHTML = '';
@@ -291,14 +406,25 @@ function renderWorks() {
         worksEl.innerHTML = `
             <div class="state">
                 <p class="state__t">这里还没有作品</p>
-                <p style="margin:0">去后台上传两张图，刷新就有啦。</p>
+                <p style="margin:0">去后台上传一张图，刷新就有啦。</p>
                 <a href="admin.html">前往后台管理</a>
             </div>`;
         return;
     }
 
     const frag = document.createDocumentFragment();
-    state.works.forEach((item, i) => frag.appendChild(createWork(item, i)));
+    frag.appendChild(createIndexHead(state.works));
+
+    // 通栏大图之外的两件左右对调。flip 单独数，不受大图插队的影响。
+    // ⚠️ 大图从第 4 件（i = 3）开始，**不能落在第 1 件**：接口是新作品在前，
+    // 第 1 件永远是刚传的那张，而大图的说明是压在图片下面的 —— 新照片
+    // 一上传就"标题跑到图下面"，看着像出错。现在每传一张，新照片都是侧边图文
+    let flip = 0;
+    state.works.forEach((item, i) => {
+        const variant = (i + 1) % 4 === 0 ? 'plate' : (flip++ % 2 ? 'right' : 'left');
+        frag.appendChild(createWork(item, i, variant));
+    });
+
     worksEl.appendChild(frag);
 
     // 先把「模糊、透明」这个初始态结算一次。不强制的话，命中缓存的小图
@@ -307,12 +433,37 @@ function renderWorks() {
     void worksEl.offsetWidth;
 
     worksEl.querySelectorAll('.work').forEach(el => io.observe(el));
+    initRail();
+    initParallax();
+    bindPointerPan();
 }
 
-function createWork(item, i) {
+/* 列表开头的 INDEX 行：件数 + 年份跨度（只算填了拍摄日期的那些作品） */
+function createIndexHead(list) {
+    const el = document.createElement('header');
+    el.className = 'works__head';
+
+    const years = list.map(w => w.takenAt ? new Date(w.takenAt).getFullYear() : 0).filter(Boolean);
+    const lo = years.length ? Math.min(...years) : 0;
+    const hi = years.length ? Math.max(...years) : 0;
+    const span = !years.length ? '' : (lo === hi ? `${lo}` : `${lo} — ${hi}`);
+
+    el.innerHTML = `
+        <p class="works__kick">INDEX</p>
+        <p class="works__sum">
+            <span>${list.length} 件</span>
+            ${span ? `<span class="works__sep" aria-hidden="true">·</span><span>${span}</span>` : ''}
+        </p>`;
+    return el;
+}
+
+function createWork(item, i, variant) {
     const el = document.createElement('article');
-    el.className = 'work';
+    el.className = `work work--${variant}`;
+    el.id = `work-${i}`;
     el.dataset.i = i;
+    // 别的页用 ?work=<后端 id> 能直接圈到这一张（见 focusFromQuery）
+    el.dataset.id = String(item.id ?? '');
 
     // 每张图的「等待色」由标题哈希而来：都很暗，只分得出彼此，不抢照片
     const [ta, tb] = tint(item);
@@ -323,18 +474,19 @@ function createWork(item, i) {
 
     el.innerHTML = `
         <figure class="work__fig">
-            <button class="work__hit" type="button" aria-label="放大查看《${escapeHtml(item.title)}》">
-                <span class="work__frame" style="aspect-ratio:${item.ratio}">
-                    <span class="work__ph"></span>
-                    <img class="work__img" alt="" loading="lazy" decoding="async">
-                </span>
+            <button class="work__frame" type="button" aria-label="放大查看《${escapeHtml(item.title)}》">
+                <span class="work__ph"></span>
+                <img class="work__img" alt="" loading="lazy" decoding="async">
+                <span class="work__zoom" aria-hidden="true">↗</span>
             </button>
         </figure>
         <div class="work__body">
             <p class="work__idx">${String(i + 1).padStart(2, '0')}</p>
             <h2 class="work__title">${escapeHtml(item.title)}</h2>
-            ${item.desc ? `<p class="work__desc">${escapeHtml(item.desc)}</p>` : ''}
-            ${provinceLine(item)}
+            <div class="work__note">
+                ${item.desc ? `<p class="work__desc">${escapeHtml(item.desc)}</p>` : ''}
+                ${metaLine(item)}
+            </div>
         </div>`;
 
     const frame = el.querySelector('.work__frame');
@@ -350,9 +502,15 @@ function createWork(item, i) {
     function reveal() {
         const nw = img.naturalWidth;
         const nh = img.naturalHeight;
-        // 真实比例和预估不符就改掉 —— 此刻图还没露出来，改了也看不见
         if (nw && nh) {
-            frame.style.aspectRatio = `${nw} / ${nh}`;
+            // 极端的竖图（长截图那种）不收窄就成了一条细线：给个下限，
+            // 多出来的让 object-fit: cover 裁掉，总比四十像素宽强
+            const ar = Math.max(nw / nh, .62);
+            // 高度预算：大图 84vh，其余 66vh。照片不该高过一屏，
+            // 竖图按这个高度反算宽度，横图照常撑满那一栏
+            const budget = variant === 'plate' ? 88 : 66;
+            frame.style.aspectRatio = `${ar}`;
+            frame.style.setProperty('--w', `${(budget * ar).toFixed(2)}vh`);
         }
         el.classList.add('is-loaded');
     }
@@ -364,20 +522,33 @@ function createWork(item, i) {
         }
     });
 
-    el.querySelector('.work__hit')
-        .addEventListener('click', () => openLightbox(i, frame));
+    frame.addEventListener('click', () => openLightbox(i, frame));
 
     img.src = item.url;
     return el;
 }
 
-/* 卡片上那行小字：省份，用「·」连接。一个省都没选的整行不输出，右栏的疏密才不会被撑开 */
-function provinceLine(item) {
-    const names = Array.isArray(item.provinces) ? item.provinces : [];
-    if (!names.length) {
+/* 图注最底下一行：年份 · 省份 · 城市。
+   年份和省份是真链接 —— 年份去时间轴那一年，省份去地图那个省；
+   城市只是文字（地图按省，没有市级边界）。三个都可能没有，一个都没就整行不输出 */
+function metaLine(item) {
+    const bits = [];
+    if (item.takenAt) {
+        const year = new Date(item.takenAt).getFullYear();
+        bits.push(`<a href="timeline.html?year=${year}">${year}</a>`);
+    }
+    const provs = Array.isArray(item.provinces) ? item.provinces : [];
+    provs.forEach(name => {
+        bits.push(`<a href="map.html?province=${encodeURIComponent(name)}">${escapeHtml(name)}</a>`);
+    });
+    if (item.city) {
+        bits.push(`<span>${escapeHtml(item.city)}</span>`);
+    }
+    if (!bits.length) {
         return '';
     }
-    return `<p class="work__prov">${escapeHtml(names.join(' · '))}</p>`;
+    return `<p class="work__meta">${bits
+        .join('<span class="work__dot" aria-hidden="true">·</span>')}</p>`;
 }
 
 function tint(item) {
@@ -391,11 +562,90 @@ function tint(item) {
     return [`hsl(${hue} 16% 12%)`, `hsl(${hue} 11% 8%)`];
 }
 
+/* 右侧那条作品索引：一件一格刻度，滚到哪一件哪一格变绿 */
+function initRail() {
+    document.querySelector('.rail')?.remove();
+    if (state.works.length < 2) {
+        return;
+    }
+
+    const nav = document.createElement('nav');
+    nav.className = 'rail';
+    nav.setAttribute('aria-label', '作品索引');
+    nav.innerHTML = `
+        <p class="rail__now"><span class="rail__num">01</span><span>/ ${String(state.works.length).padStart(2, '0')}</span></p>
+        <ol class="rail__list">
+            ${state.works.map((w, i) => `<li><a class="rail__item" href="#work-${i}" data-i="${i}" aria-label="第 ${i + 1} 件：${escapeHtml(w.title)}"><span class="rail__tick"></span></a></li>`).join('')}
+        </ol>`;
+    document.body.appendChild(nav);
+
+    const links = [...nav.querySelectorAll('.rail__item')];
+    const numEl = nav.querySelector('.rail__num');
+    const cards = [...worksEl.querySelectorAll('.work')];
+    let active = -1;
+    let raf = 0;
+
+    function setActive(i) {
+        if (i === active) {
+            return;
+        }
+        links[active]?.classList.remove('is-on');
+        links[active]?.removeAttribute('aria-current');
+        active = i;
+        links[i].classList.add('is-on');
+        links[i].setAttribute('aria-current', 'true');
+        numEl.textContent = String(i + 1).padStart(2, '0');
+    }
+
+    // 不另开一个观察器：十几张图的中心点算一遍很便宜，
+    // 而且「离屏幕中线最近的那张」比 IntersectionObserver 的阈值好调
+    function frame() {
+        raf = 0;
+        const mid = innerHeight / 2;
+        let best = 0;
+        let bestD = Infinity;
+        cards.forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            const d = Math.abs(r.top + r.height / 2 - mid);
+            if (d < bestD) {
+                bestD = d;
+                best = i;
+            }
+        });
+        setActive(best);
+    }
+
+    function onScroll() {
+        if (!raf) {
+            raf = requestAnimationFrame(frame);
+        }
+    }
+
+    nav.addEventListener('click', (e) => {
+        const a = e.target.closest('.rail__item');
+        if (!a) {
+            return;
+        }
+        const card = cards[+a.dataset.i];
+        if (!card) {
+            return;
+        }
+        e.preventDefault();
+        card.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    });
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    frame();
+}
+
 function showSkeletons() {
-    const shapes = ['4 / 5', '3 / 2', '1 / 1'];
-    worksEl.innerHTML = Array.from({ length: 3 }, (_, i) => `
+    /* 第一件现在不是通栏大图了（见 renderWorks 的注释），骨架也就别再画一张
+       大图占位 —— 加载完从大图跳成侧边图文，会白抖一下 */
+    const shapes = ['3 / 2', '4 / 5', '3 / 2'];
+    worksEl.innerHTML = shapes.map((ratio) => `
         <div class="sk">
-            <div class="sk__box" style="aspect-ratio:${shapes[i % shapes.length]}"></div>
+            <div class="sk__box" style="aspect-ratio:${ratio}"></div>
             <div class="sk__side">
                 <div class="sk__bar" style="width:34px"></div>
                 <div class="sk__bar" style="width:62%"></div>

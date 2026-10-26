@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>一些想法 · 三叶修图</title>
+    <meta name="theme-color" content="#08080A">
+    <link rel="stylesheet" href="css/closing.css">
+</head>
+<body>
+
+<!-- 进场那层「雾」：盖住整页，慢慢散开（closing.css 的 .fog） -->
+<div class="fog" id="fog" aria-hidden="true"></div>
+
+<main class="page">
+
+    <!-- 回首页 -->
+    <a class="page__back" href="index.html">‹ 返回作品</a>
+
+    <!-- 装饰线 + 这句引文。字是一个个 span，由 closing.js 按序浮现 -->
+    <div class="page__quote">
+        <span class="page__line" aria-hidden="true"></span>
+        <p class="page__text" id="quoteText"></p>
+    </div>
+
+</main>
+
+<script type="module" src="js/closing.js"></script>
+</body>
+</html>

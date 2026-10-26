@@ -34,7 +34,7 @@ public class WorkController {
     }
 
     /**
-     * 上传两张图片（before/after）新建作品，desc 是可选的一句话描述。
+     * 上传一张图片新建作品，desc 是可选的一句话描述。
      * provinces 用重复参数传（provinces=四川省&provinces=西藏自治区），
      * 一个都不勾时这个参数整个不存在，所以必须 required = false —— 未归类的作品也要能传。
      * <p>
@@ -48,9 +48,8 @@ public class WorkController {
                                @RequestParam(value = "provinces", required = false) List<String> provinces,
                                @RequestParam(value = "city", required = false) String city,
                                @RequestParam(value = "takenAt", required = false, defaultValue = "0") long takenAt,
-                               @RequestParam("before") MultipartFile before,
-                               @RequestParam("after") MultipartFile after) {
-        return Result.ok(workService.create(provinces, title, desc, city, takenAt, before, after));
+                               @RequestParam("file") MultipartFile file) {
+        return Result.ok(workService.create(provinces, title, desc, city, takenAt, file));
     }
 
     /**
