@@ -133,8 +133,13 @@ body::before {
 
 /* 1. 首页那个 .lb 是 z-index: 60，因为它只跟首屏(0)和 .flow(10)比。
       地图页的详情层是 160、顶栏 100 —— 不改的话从详情里点开灯箱，
-      图会被详情盖在下面，看着像没反应 */
-.lb {
+      图会被详情盖在下面，看着像没反应。
+
+   ⚠️ 这里必须写成 .lb.lb（而不是 .lb）：生产构建里 Vite 会把 map.css
+      排在 gallery.css **前面**（dev 下是反过来），同优先级时后加载的赢，
+      灯箱的 z-index 会被 gallery 的 60 盖回去，又掉到详情层下面。
+      叠一个类名把优先级提到 (0,2,0)，跟加载顺序无关 */
+.lb.lb {
     z-index: 200;
 }
 
@@ -158,8 +163,10 @@ body::before {
 
 /* 2. gallery.css 给 html 挂了 scrollbar-gutter: stable，那是首页灯箱
       锁滚动时防横向抖用的。地图页整页不滚（详情层自己内部滚），
-      留着会在右边留一条约 15px 的缝 */
-html {
+      留着会在右边留一条约 15px 的缝。
+      ⚠️ 用 html:root 而不是 html：同样是生产构建的加载顺序问题（见上一条），
+      权重高一级就不怕被 gallery 盖回来 */
+html:root {
     scrollbar-gutter: auto;
 }
 
@@ -283,15 +290,10 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--pad);
-    background: rgba(8, 8, 10, .78);
-    -webkit-backdrop-filter: blur(20px) saturate(1.3);
-    backdrop-filter: blur(20px) saturate(1.3);
-    /* 原来是 border-bottom 一条等宽细线 —— 顶栏下面是一条横贯全屏的硬边，
-       像给页面盖了个盖子。改成把整块（连磨砂一起）从下往上擦掉：
-       顶栏就那么化进地图里，没有边。mask 会连 backdrop-filter 一起裁，
-       所以底下那条模糊带也不会留一道硬边 */
-    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
-    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    /* 没有底色、没有磨砂：原来那层 rgba(8,8,10,.78) 会在顶部横一条黑带，
+       像给地图盖了个盖子。现在标题和胶囊直接浮在照片上，靠文字阴影托住可读性 */
+    background: transparent;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, .55);
     animation: barIn .8s var(--ease) both;
 }
 
